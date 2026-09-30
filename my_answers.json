@@ -1,0 +1,495 @@
+[
+  {
+    "puzzle_id": "line_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Obedient Numbers",
+    "_difficulty": "Beginner",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "sqrt",
+      "sin",
+      "log"
+    ]
+  },
+  {
+    "puzzle_id": "line_02",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Reluctant Ascent",
+    "_difficulty": "Beginner",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "sqrt",
+      "sin"
+    ]
+  },
+  {
+    "puzzle_id": "square_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Bend in the Road",
+    "_difficulty": "Beginner",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "sqrt",
+      "sin",
+      "log"
+    ]
+  },
+  {
+    "puzzle_id": "sqrt_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Momentum Decay",
+    "_difficulty": "Beginner",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "sqrt",
+      "log",
+      "reciprocal"
+    ]
+  },
+  {
+    "puzzle_id": "log_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Compressed Universe",
+    "_difficulty": "Beginner",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "sqrt",
+      "log",
+      "reciprocal"
+    ]
+  },
+  {
+    "puzzle_id": "distractor_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Four Suspects",
+    "_difficulty": "Beginner",
+    "_input_features": [
+      "x1",
+      "x2",
+      "x3",
+      "x4"
+    ],
+    "_allowed_transforms": [
+      "identity"
+    ]
+  },
+  {
+    "puzzle_id": "almost_linear_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Imposter Line",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "cos",
+      "square",
+      "sqrt"
+    ],
+    "_allowed_binary_transforms": [
+      "add"
+    ]
+  },
+  {
+    "puzzle_id": "almost_linear_02",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Static on the Signal",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "cos",
+      "square"
+    ],
+    "_allowed_binary_transforms": [
+      "add"
+    ]
+  },
+  {
+    "puzzle_id": "reciprocal_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Vanishing Point",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "reciprocal",
+      "log",
+      "sqrt",
+      "square"
+    ]
+  },
+  {
+    "puzzle_id": "abs_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Symmetric Grudge",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "abs",
+      "square",
+      "sqrt",
+      "sin"
+    ]
+  },
+  {
+    "puzzle_id": "cos_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Quarter-Turn",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "cos",
+      "square",
+      "sqrt"
+    ]
+  },
+  {
+    "puzzle_id": "periodic_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Repeating Rumour",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "cos",
+      "square",
+      "sqrt"
+    ]
+  },
+  {
+    "puzzle_id": "periodic_02",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Seven Days of Nothing",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "cos",
+      "sin_period7",
+      "cos_period7"
+    ]
+  },
+  {
+    "puzzle_id": "product_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Missing Third Variable",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x1",
+      "x2"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "sqrt"
+    ],
+    "_allowed_binary_transforms": [
+      "multiply",
+      "add",
+      "subtract"
+    ]
+  },
+  {
+    "puzzle_id": "ratio_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Speed Without Units",
+    "_difficulty": "Intermediate",
+    "_input_features": [
+      "x1",
+      "x2"
+    ],
+    "_allowed_transforms": [
+      "identity"
+    ],
+    "_allowed_binary_transforms": [
+      "multiply",
+      "divide",
+      "add",
+      "subtract"
+    ]
+  },
+  {
+    "puzzle_id": "circle_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Exclusion Zone",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x1",
+      "x2"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square"
+    ],
+    "_allowed_binary_transforms": [
+      "multiply",
+      "add",
+      "distance"
+    ]
+  },
+  {
+    "puzzle_id": "distance_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Displacement Field",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x1",
+      "x2"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "sqrt"
+    ],
+    "_allowed_binary_transforms": [
+      "distance",
+      "add",
+      "multiply"
+    ]
+  },
+  {
+    "puzzle_id": "cubic_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Tripling the Problem",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "cube",
+      "abs",
+      "sqrt"
+    ]
+  },
+  {
+    "puzzle_id": "boss_piecewise",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Three Regimes",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity"
+    ]
+  },
+  {
+    "puzzle_id": "boss_multi",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Hidden Tax",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x1",
+      "x2",
+      "x3"
+    ],
+    "_allowed_transforms": [
+      "identity"
+    ],
+    "_allowed_binary_transforms": [
+      "multiply",
+      "add"
+    ]
+  },
+  {
+    "puzzle_id": "boss_sin_sum",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Interfering Signals",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "cos"
+    ]
+  },
+  {
+    "puzzle_id": "boss_multi_feat",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "Chaos in Three Channels",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x1",
+      "x2",
+      "x3"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "square",
+      "sqrt",
+      "log"
+    ]
+  },
+  {
+    "puzzle_id": "period_boss",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Noisy Calendar",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x",
+      "x2"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin_period7",
+      "cos_period7",
+      "sin",
+      "cos"
+    ]
+  },
+  {
+    "puzzle_id": "polynomial_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Bent Wire",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "square",
+      "cube",
+      "sqrt",
+      "abs"
+    ]
+  },
+  {
+    "puzzle_id": "phase_01",
+    "model": "linear_regression",
+    "features": [
+      "???"
+    ],
+    "_title": "The Hidden Angle",
+    "_difficulty": "Challenge",
+    "_input_features": [
+      "x"
+    ],
+    "_allowed_transforms": [
+      "identity",
+      "sin",
+      "cos",
+      "square"
+    ],
+    "_allowed_binary_transforms": [
+      "add"
+    ]
+  }
+]

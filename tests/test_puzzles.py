@@ -1,13 +1,13 @@
 """
-test_puzzles.py — Tests for the puzzle registry and hint/explanation system.
+test_puzzles.py — Tests for the updated puzzle registry and explanation system.
 """
 
 import pytest
+import json
 
 from blackbox_game.puzzles import get_puzzle, list_puzzles, PUZZLE_REGISTRY
-from blackbox_game.hints import get_hint, get_explanation, get_all_hints
+from blackbox_game.hints import get_explanation
 from blackbox_game.models import Puzzle
-import json
 
 
 class TestPuzzleRegistry:
@@ -30,8 +30,7 @@ class TestPuzzleRegistry:
         assert len(ids) == len(set(ids))
 
     def test_list_puzzles_returns_all(self):
-        puzzles = list_puzzles()
-        assert len(puzzles) == 25
+        assert len(list_puzzles()) == 25
 
     def test_list_puzzles_filter_beginner(self):
         beginner = list_puzzles(difficulty=1)
@@ -48,28 +47,46 @@ class TestPuzzleRegistry:
         assert len(challenge) == 10
         assert all(p["difficulty"] == 3 for p in challenge)
 
+    def test_only_two_decision_tree_puzzles(self):
+        """Reduced from 6 DT puzzles to 2."""
+        dt_puzzles = [
+            p for p in PUZZLE_REGISTRY.values()
+            if p.intended_model == "decision_tree"
+        ]
+        assert len(dt_puzzles) == 2, (
+            f"Expected 2 DT puzzles, found {len(dt_puzzles)}: "
+            f"{[p.id for p in dt_puzzles]}"
+        )
+
+    def test_new_lr_puzzles_present(self):
+        """New LR puzzles added in v2."""
+        for pid in ("abs_01", "cos_01", "polynomial_01", "phase_01"):
+            p = get_puzzle(pid)
+            assert p.intended_model == "linear_regression"
+
     def test_all_puzzles_have_required_fields(self):
         required = [
             "id", "title", "category", "difficulty", "description",
             "input_features", "intended_model", "solution_features",
-            "hints", "explanation", "real_world_connection",
+            "explanation", "real_world_connection",
         ]
         for pid, puzzle in PUZZLE_REGISTRY.items():
-            for field in required:
-                assert hasattr(puzzle, field), f"Puzzle '{pid}' missing field '{field}'"
-                val = getattr(puzzle, field)
-                assert val is not None, f"Puzzle '{pid}' has None for '{field}'"
+            for f in required:
+                assert hasattr(puzzle, f), f"Puzzle '{pid}' missing '{f}'"
+                assert getattr(puzzle, f) is not None, f"Puzzle '{pid}' has None for '{f}'"
 
-    def test_all_puzzles_have_at_least_two_hints(self):
+    def test_hints_are_empty_or_absent(self):
+        """Hints have been disabled — all puzzles should have empty hints lists."""
         for pid, puzzle in PUZZLE_REGISTRY.items():
-            assert len(puzzle.hints) >= 2, (
-                f"Puzzle '{pid}' has only {len(puzzle.hints)} hint(s). Need at least 2."
+            assert isinstance(puzzle.hints, list), f"Puzzle '{pid}' hints is not a list"
+            assert len(puzzle.hints) == 0, (
+                f"Puzzle '{pid}' has {len(puzzle.hints)} hints; expected 0"
             )
 
     def test_all_puzzles_have_nonempty_explanation(self):
         for pid, puzzle in PUZZLE_REGISTRY.items():
             assert len(puzzle.explanation) > 20, (
-                f"Puzzle '{pid}' explanation is too short."
+                f"Puzzle '{pid}' explanation too short."
             )
 
     def test_difficulty_in_valid_range(self):
@@ -79,30 +96,32 @@ class TestPuzzleRegistry:
             )
 
     def test_intended_model_is_valid(self):
-        valid_models = {"linear_regression", "decision_tree"}
+        valid = {"linear_regression", "decision_tree"}
         for pid, puzzle in PUZZLE_REGISTRY.items():
-            assert puzzle.intended_model in valid_models, (
+            assert puzzle.intended_model in valid, (
                 f"Puzzle '{pid}' has invalid intended_model '{puzzle.intended_model}'."
             )
+
+    def test_titles_are_different_from_ids(self):
+        """Titles should be cryptic — not just the ID reworded."""
+        for pid, puzzle in PUZZLE_REGISTRY.items():
+            # Title should NOT directly contain the category word or the id as-is
+            assert puzzle.title != pid, f"Puzzle '{pid}' title is same as ID"
 
 
 class TestPuzzleSerialization:
 
     def test_to_dict_returns_dict(self):
-        puzzle = get_puzzle("square_01")
-        d = puzzle.to_dict()
-        assert isinstance(d, dict)
+        assert isinstance(get_puzzle("square_01").to_dict(), dict)
 
     def test_to_json_is_valid_json(self):
         puzzle = get_puzzle("square_01")
-        json_str = puzzle.to_json()
-        parsed = json.loads(json_str)
+        parsed = json.loads(puzzle.to_json())
         assert parsed["id"] == "square_01"
 
     def test_round_trip_serialization(self):
-        puzzle = get_puzzle("product_01")
-        json_str = puzzle.to_json()
-        puzzle2 = Puzzle.from_json(json_str)
+        puzzle  = get_puzzle("product_01")
+        puzzle2 = Puzzle.from_json(puzzle.to_json())
         assert puzzle2.id == puzzle.id
         assert puzzle2.function.type == puzzle.function.type
         assert puzzle2.solution_features == puzzle.solution_features
@@ -110,32 +129,12 @@ class TestPuzzleSerialization:
     def test_all_puzzles_serializable(self):
         for pid, puzzle in PUZZLE_REGISTRY.items():
             try:
-                json_str = puzzle.to_json()
-                json.loads(json_str)
+                json.loads(puzzle.to_json())
             except Exception as exc:
-                pytest.fail(f"Puzzle '{pid}' could not be serialised to JSON: {exc}")
+                pytest.fail(f"Puzzle '{pid}' not serialisable: {exc}")
 
 
-class TestHintSystem:
-
-    def test_get_first_hint(self):
-        puzzle = get_puzzle("square_01")
-        hint = get_hint(puzzle, 0)
-        assert hint["hint_index"] == 0
-        assert isinstance(hint["text"], str)
-        assert len(hint["text"]) > 5
-        assert hint["cost"] == -20
-
-    def test_hint_index_out_of_bounds(self):
-        puzzle = get_puzzle("square_01")
-        hint = get_hint(puzzle, 999)
-        assert "No more hints" in hint["text"]
-        assert hint["cost"] == 0
-
-    def test_total_hints_reported_correctly(self):
-        puzzle = get_puzzle("line_01")
-        hint = get_hint(puzzle, 0)
-        assert hint["total_hints"] == len(puzzle.hints)
+class TestExplanationSystem:
 
     def test_get_explanation_returns_dict(self):
         puzzle = get_puzzle("square_01")
@@ -145,9 +144,7 @@ class TestHintSystem:
         assert "intended_model" in exp
         assert "real_world_connection" in exp
 
-    def test_get_all_hints_returns_all(self):
-        puzzle = get_puzzle("line_01")
-        hints = get_all_hints(puzzle)
-        assert len(hints) == len(puzzle.hints)
-        for i, h in enumerate(hints):
-            assert h["hint_index"] == i
+    def test_explanation_text_nonempty(self):
+        for pid, puzzle in PUZZLE_REGISTRY.items():
+            exp = get_explanation(puzzle)
+            assert len(exp["explanation"]) > 10, f"Puzzle '{pid}' empty explanation"

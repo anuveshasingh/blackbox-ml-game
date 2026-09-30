@@ -1,140 +1,217 @@
 """
-test_scoring.py — Tests for the scoring engine.
+test_scoring.py — Tests for scoring engine, fuzzy matching, and evaluate_submission.
 """
 
 import pytest
 from blackbox_game.scoring import (
-    PlayerSession,
-    compute_score,
-    CORRECT_R2_THRESHOLD,
-    PENALTY_HINT,
-    PENALTY_WRONG_SUBMIT,
-    SCORE_CORRECT_MODEL,
-    SCORE_CORRECT_FEATURE,
-    SCORE_QUALITY_BONUS,
+    PlayerSession, compute_score, check_fuzzy_match, _parse_power_feature,
+    CORRECT_R2_THRESHOLD, PENALTY_WRONG_SUBMIT,
+    SCORE_CORRECT_MODEL, SCORE_CORRECT_FEATURE, SCORE_QUALITY_BONUS,
+    POWER_MAP,
 )
 from blackbox_game import evaluate_submission
 
+
+# ---------------------------------------------------------------------------
+# PlayerSession
+# ---------------------------------------------------------------------------
 
 class TestPlayerSession:
 
     def test_initial_state(self):
         s = PlayerSession(puzzle_id="test_01")
         assert s.attempts == 0
-        assert s.hints_used == 0
         assert s.solved is False
         assert s.score == 0
         assert s.end_time is None
 
-    def test_use_hint_increments_counter(self):
-        s = PlayerSession(puzzle_id="test_01")
-        idx = s.use_hint()
-        assert idx == 0
-        assert s.hints_used == 1
-        idx2 = s.use_hint()
-        assert idx2 == 1
-        assert s.hints_used == 2
-
-    def test_time_taken_none_before_solve(self):
-        s = PlayerSession(puzzle_id="test_01")
-        assert s.time_taken is None
-
     def test_to_dict_contains_required_keys(self):
         s = PlayerSession(puzzle_id="test_01")
         d = s.to_dict()
-        for key in ["puzzle_id", "attempts", "hints_used", "solved", "score"]:
+        for key in ["puzzle_id", "attempts", "solved", "score"]:
             assert key in d
 
+    def test_time_taken_none_before_solve(self):
+        assert PlayerSession(puzzle_id="x").time_taken is None
+
+
+# ---------------------------------------------------------------------------
+# Power family parsing
+# ---------------------------------------------------------------------------
+
+class TestParsePowerFeature:
+
+    def test_transform_shorthand(self):
+        info = _parse_power_feature("square:x")
+        assert info == (2.0, "x")
+
+    def test_identity_shorthand(self):
+        info = _parse_power_feature("identity:x")
+        assert info == (1.0, "x")
+
+    def test_reciprocal(self):
+        info = _parse_power_feature("reciprocal:x")
+        assert info == (-1.0, "x")
+
+    def test_plain_column_is_identity(self):
+        info = _parse_power_feature("x")
+        assert info == (1.0, "x")
+
+    def test_non_power_transform_returns_none(self):
+        assert _parse_power_feature("sin:x") is None
+        assert _parse_power_feature("log:x") is None
+        assert _parse_power_feature("cos:x") is None
+
+    def test_binary_dict_returns_none(self):
+        assert _parse_power_feature({"binary": "multiply", "a": "x1", "b": "x2"}) is None
+
+
+# ---------------------------------------------------------------------------
+# Fuzzy matching
+# ---------------------------------------------------------------------------
+
+class TestFuzzyMatching:
+
+    def test_exact_power_gives_high_fraction(self):
+        frac, desc = check_fuzzy_match(["square:x"], ["square:x"])
+        assert frac > 0.9
+
+    def test_off_by_one_power(self):
+        """square (2) vs cube (3): diff=1, fraction=1/1=1.0 capped at 0.99"""
+        frac, desc = check_fuzzy_match(["square:x"], ["cube:x"])
+        assert abs(frac - 0.99) < 0.01
+        assert "x^" in desc  # description mentions powers
+
+    def test_off_by_two_powers(self):
+        """identity (1) vs cube (3): diff=2, fraction=1/2=0.5"""
+        frac, desc = check_fuzzy_match(["identity:x"], ["cube:x"])
+        assert abs(frac - 0.5) < 0.01
+
+    def test_sqrt_vs_square(self):
+        """sqrt (0.5) vs square (2): diff=1.5, fraction=1/1.5≈0.667"""
+        frac, desc = check_fuzzy_match(["sqrt:x"], ["square:x"])
+        assert abs(frac - (1 / 1.5)) < 0.01
+
+    def test_wrong_column_no_match(self):
+        """Different column names → no fuzzy match."""
+        frac, _ = check_fuzzy_match(["square:x1"], ["square:x2"])
+        assert frac == 0.0
+
+    def test_non_power_transform_no_match(self):
+        """sin is not in power family → no fuzzy match."""
+        frac, _ = check_fuzzy_match(["sin:x"], ["square:x"])
+        assert frac == 0.0
+
+    def test_empty_features_no_match(self):
+        frac, _ = check_fuzzy_match([], ["square:x"])
+        assert frac == 0.0
+
+    def test_multi_feature_partial(self):
+        """Submit [square:x] for solution [square:x, identity:x] → partial (0.5)."""
+        frac, _ = check_fuzzy_match(["square:x"], ["square:x", "identity:x"])
+        assert frac < 0.99  # partial, not full
+
+
+# ---------------------------------------------------------------------------
+# compute_score
+# ---------------------------------------------------------------------------
 
 class TestComputeScore:
 
     def _session(self):
-        return PlayerSession(puzzle_id="test_01")
+        return PlayerSession(puzzle_id="test")
 
-    def test_correct_answer_earns_positive_score(self):
+    def test_correct_answer_earns_full_score(self):
         s = self._session()
-        result = compute_score(s, model_correct=True, fit_quality=0.99)
-        assert result["is_correct"] is True
-        assert result["points_earned"] > 0
+        r = compute_score(s, model_correct=True, fit_quality=0.999)
+        assert r["is_correct"] is True
+        assert r["model_bonus"] == SCORE_CORRECT_MODEL
+        assert r["feature_bonus"] == SCORE_CORRECT_FEATURE
         assert s.score > 0
 
-    def test_incorrect_answer_earns_penalty(self):
+    def test_wrong_model_incorrect(self):
         s = self._session()
-        result = compute_score(s, model_correct=True, fit_quality=0.10)
-        assert result["is_correct"] is False
-        assert result["points_earned"] < 0
+        r = compute_score(s, model_correct=False, fit_quality=0.999)
+        assert r["is_correct"] is False
 
-    def test_correct_beats_incorrect(self):
-        s1 = self._session()
-        compute_score(s1, model_correct=True, fit_quality=0.999)
-        score_correct = s1.score
-
-        s2 = self._session()
-        compute_score(s2, model_correct=True, fit_quality=0.10)
-        score_incorrect = s2.score
-
-        assert score_correct > score_incorrect
-
-    def test_hint_reduces_final_score(self):
-        """Using a hint should result in a lower total score after a correct solve."""
-        s_no_hint = self._session()
-        compute_score(s_no_hint, model_correct=True, fit_quality=0.999)
-        score_no_hint = s_no_hint.score
-
-        s_hint = self._session()
-        s_hint.use_hint()  # use one hint
-        compute_score(s_hint, model_correct=True, fit_quality=0.999)
-        score_with_hint = s_hint.score
-
-        assert score_no_hint > score_with_hint
+    def test_wrong_answer_penalty(self):
+        s = self._session()
+        r = compute_score(s, model_correct=True, fit_quality=0.1)
+        assert r["is_correct"] is False
+        assert r["penalty"] == PENALTY_WRONG_SUBMIT
 
     def test_score_never_negative(self):
-        """Score should never drop below zero regardless of penalties."""
         s = self._session()
-        # Make lots of wrong attempts
         for _ in range(20):
             compute_score(s, model_correct=False, fit_quality=-5.0)
         assert s.score >= 0
 
-    def test_wrong_model_is_not_correct(self):
+    def test_correct_beats_wrong(self):
+        s1 = self._session()
+        compute_score(s1, model_correct=True, fit_quality=0.999)
+
+        s2 = self._session()
+        compute_score(s2, model_correct=True, fit_quality=0.1)
+
+        assert s1.score > s2.score
+
+    def test_fuzzy_gives_partial_credit(self):
+        """Fuzzy match → partial credit, no penalty, less than full correct."""
+        s_correct = self._session()
+        compute_score(s_correct, model_correct=True, fit_quality=0.999)
+        full_score = s_correct.score
+
+        s_fuzzy = self._session()
+        fuzzy_info = (0.5, "off by 2 powers")  # 50% fraction
+        compute_score(s_fuzzy, model_correct=True, fit_quality=0.1,
+                      fuzzy_info=fuzzy_info)
+        fuzzy_score = s_fuzzy.score
+
+        assert fuzzy_score > 0          # partial credit given
+        assert fuzzy_score < full_score  # but less than full
+
+    def test_fuzzy_wrong_model_no_credit(self):
+        """Even a good fuzzy match gives nothing if the model is wrong."""
         s = self._session()
-        # Good fit but wrong model type
-        result = compute_score(s, model_correct=False, fit_quality=0.99)
-        assert result["is_correct"] is False
+        fuzzy_info = (0.99, "almost exact")
+        r = compute_score(s, model_correct=False, fit_quality=0.1,
+                          fuzzy_info=fuzzy_info)
+        assert r["is_fuzzy"] is False
+        assert r["feature_bonus"] == 0
 
     def test_quality_bonus_for_perfect_fit(self):
         s = self._session()
-        result = compute_score(s, model_correct=True, fit_quality=1.0)
-        assert result["quality_bonus"] == SCORE_QUALITY_BONUS
+        r = compute_score(s, model_correct=True, fit_quality=1.0)
+        assert r["quality_bonus"] == SCORE_QUALITY_BONUS
 
     def test_no_quality_bonus_at_threshold(self):
         s = self._session()
-        result = compute_score(
-            s, model_correct=True, fit_quality=CORRECT_R2_THRESHOLD
-        )
-        assert result["quality_bonus"] == 0
+        r = compute_score(s, model_correct=True, fit_quality=CORRECT_R2_THRESHOLD)
+        assert r["quality_bonus"] == 0
 
-    def test_attempts_increment(self):
-        s = self._session()
-        compute_score(s, model_correct=True, fit_quality=0.10)
-        compute_score(s, model_correct=True, fit_quality=0.10)
-        assert s.attempts == 2
-
-    def test_session_marked_solved_on_correct(self):
+    def test_session_solved_flag(self):
         s = self._session()
         compute_score(s, model_correct=True, fit_quality=0.999)
         assert s.solved is True
         assert s.end_time is not None
 
+    def test_attempts_increment(self):
+        s = self._session()
+        compute_score(s, model_correct=True, fit_quality=0.1)
+        compute_score(s, model_correct=True, fit_quality=0.1)
+        assert s.attempts == 2
+
     def test_message_is_string(self):
         s = self._session()
-        result = compute_score(s, model_correct=True, fit_quality=0.999)
-        assert isinstance(result["message"], str)
-        assert len(result["message"]) > 0
+        r = compute_score(s, model_correct=True, fit_quality=0.999)
+        assert isinstance(r["message"], str) and len(r["message"]) > 0
 
+
+# ---------------------------------------------------------------------------
+# evaluate_submission integration
+# ---------------------------------------------------------------------------
 
 class TestEvaluateSubmissionAPI:
-    """Integration tests for the high-level evaluate_submission function."""
 
     def test_correct_submission_returns_true(self):
         result = evaluate_submission(
@@ -149,11 +226,22 @@ class TestEvaluateSubmissionAPI:
         result = evaluate_submission(
             puzzle_id="square_01",
             model="linear_regression",
-            features=["identity:x"],
+            features=["sin:x"],
         )
         assert result["is_correct"] is False
 
-    def test_wrong_model_returns_false(self):
+    def test_fuzzy_match_detected(self):
+        """cube:x on square_01 (y=x²) → fuzzy match (power off by 1)."""
+        result = evaluate_submission(
+            puzzle_id="square_01",
+            model="linear_regression",
+            features=["cube:x"],
+        )
+        assert result["is_correct"] is False
+        assert result["is_fuzzy"] is True
+        assert result["score_result"]["feature_bonus"] > 0
+
+    def test_wrong_model_not_correct(self):
         result = evaluate_submission(
             puzzle_id="line_01",
             model="decision_tree",
@@ -164,7 +252,7 @@ class TestEvaluateSubmissionAPI:
     def test_unknown_puzzle_raises(self):
         with pytest.raises(KeyError):
             evaluate_submission(
-                puzzle_id="does_not_exist",
+                puzzle_id="nonexistent",
                 model="linear_regression",
                 features=["identity:x"],
             )
@@ -177,33 +265,26 @@ class TestEvaluateSubmissionAPI:
         )
         assert "error" in result
 
-    def test_explanation_included_on_success(self):
-        result = evaluate_submission(
-            puzzle_id="line_01",
-            model="linear_regression",
-            features=["identity:x"],
-        )
-        assert result["is_correct"] is True
-        assert "explanation" in result
+    def test_explanation_on_success_only(self):
+        # Correct → explanation included
+        ok = evaluate_submission("line_01", "linear_regression", ["identity:x"])
+        assert ok["is_correct"] is True
+        assert "explanation" in ok
 
-    def test_explanation_not_leaked_on_failure(self):
-        result = evaluate_submission(
-            puzzle_id="square_01",
-            model="linear_regression",
-            features=["identity:x"],   # wrong transform
-        )
-        assert result["is_correct"] is False
-        assert "explanation" not in result
+        # Wrong → no explanation
+        bad = evaluate_submission("square_01", "linear_regression", ["sin:x"])
+        assert bad["is_correct"] is False
+        assert "explanation" not in bad
 
-    def test_piecewise_puzzle_tree_correct(self):
+    def test_piecewise_decision_tree_correct(self):
         result = evaluate_submission(
-            puzzle_id="piecewise_01",
+            puzzle_id="boss_piecewise",
             model="decision_tree",
             features=["identity:x"],
         )
         assert result["is_correct"] is True
 
-    def test_product_puzzle_with_binary_feature(self):
+    def test_product_binary_feature(self):
         result = evaluate_submission(
             puzzle_id="product_01",
             model="linear_regression",
@@ -211,11 +292,36 @@ class TestEvaluateSubmissionAPI:
         )
         assert result["is_correct"] is True
 
-    def test_session_object_returned(self):
+    def test_abs_puzzle_correct(self):
         result = evaluate_submission(
-            puzzle_id="line_01",
+            puzzle_id="abs_01",
             model="linear_regression",
-            features=["identity:x"],
+            features=["abs:x"],
         )
+        assert result["is_correct"] is True
+
+    def test_cos_puzzle_correct(self):
+        result = evaluate_submission(
+            puzzle_id="cos_01",
+            model="linear_regression",
+            features=["cos:x"],
+        )
+        assert result["is_correct"] is True
+
+    def test_phase_puzzle_correct(self):
+        result = evaluate_submission(
+            puzzle_id="phase_01",
+            model="linear_regression",
+            features=["sin:x", "cos:x"],
+        )
+        assert result["is_correct"] is True
+
+    def test_session_in_response(self):
+        result = evaluate_submission("line_01", "linear_regression", ["identity:x"])
         assert "session" in result
         assert "score" in result["session"]
+
+    def test_no_hints_field_in_session(self):
+        """hints_used removed from session since hints are disabled."""
+        result = evaluate_submission("line_01", "linear_regression", ["identity:x"])
+        assert "hints_used" not in result["session"]
