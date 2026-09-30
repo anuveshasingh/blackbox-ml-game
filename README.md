@@ -1,4 +1,4 @@
-# 🎮 Blackbox ML Game
+# Blackbox ML Game
 
 > Clone the repo. Look at the data. Experiment with transformations. Discover the hidden rule. Submit your answer.
 
@@ -22,7 +22,7 @@ You can see the data. You cannot see the function. Your job is to:
 4. Run the scorer and see your score
 
 The game teaches **feature engineering** and model selection through discovery.  
-Target audience: first-year IIT Delhi students with zero ML/AI background.
+Target audience: first-year IIT Delhi students 
 
 ---
 
