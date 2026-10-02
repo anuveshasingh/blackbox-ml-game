@@ -40,6 +40,8 @@ def binary_path(name: str) -> Path:
     path = bundle_path / executable_name
     if bundle_path.is_file():
         bundle_path.unlink()
+    if path.exists() and not path.is_file():
+        shutil.rmtree(bundle_path)
     if not path.exists():
         archive_name = f"{name}.zip"
         url = f"https://github.com/{REPOSITORY}/releases/latest/download/{archive_name}"
@@ -71,8 +73,8 @@ def binary_path(name: str) -> Path:
             temporary_path.unlink(missing_ok=True)
             shutil.rmtree(temporary_bundle, ignore_errors=True)
             raise
-        if os.name != "nt":
-            path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    if os.name != "nt":
+        path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return path
 
 

@@ -55,7 +55,7 @@ jobs:
           with ZipFile(archive, "w", ZIP_DEFLATED) as output:
               for file in root.rglob("*"):
                   if file.is_file():
-                      output.write(file, file.relative_to("dist"))
+                      output.write(file, file.relative_to(root))
           PY
 
       - name: Upload executable
