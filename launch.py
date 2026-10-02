@@ -36,8 +36,26 @@ def binary_path(name: str) -> Path:
     path = cache_root / name
     if not path.exists():
         url = f"https://github.com/{REPOSITORY}/releases/latest/download/{name}"
+        temporary_path = path.with_name(f"{path.name}.part")
+
+        def report_progress(block_count: int, block_size: int, total_size: int) -> None:
+            downloaded = block_count * block_size
+            if total_size > 0:
+                downloaded = min(downloaded, total_size)
+                percent = downloaded / total_size * 100
+                status = f"{percent:5.1f}% ({downloaded / 1_048_576:.1f}/{total_size / 1_048_576:.1f} MB)"
+            else:
+                status = f"{downloaded / 1_048_576:.1f} MB"
+            print(f"\rDownloading the game: {status}", end="", flush=True)
+
         print(f"Downloading the game for {platform.system()} {platform.machine()}...", flush=True)
-        urllib.request.urlretrieve(url, path)
+        try:
+            urllib.request.urlretrieve(url, temporary_path, reporthook=report_progress)
+            temporary_path.replace(path)
+            print("", flush=True)
+        except Exception:
+            temporary_path.unlink(missing_ok=True)
+            raise
         if os.name != "nt":
             path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return path
