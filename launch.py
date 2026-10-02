@@ -11,6 +11,7 @@ from zipfile import ZipFile
 from pathlib import Path
 
 REPOSITORY = "anuveshasingh/blackbox-ml-game"
+RELEASE_TAG = "v0.2.0"
 
 
 def asset_name() -> str:
@@ -33,7 +34,7 @@ def asset_name() -> str:
 
 
 def binary_path(name: str) -> Path:
-    cache_root = Path.home() / ".cache" / "blackbox-ml-game"
+    cache_root = Path.home() / ".cache" / "blackbox-ml-game" / RELEASE_TAG
     cache_root.mkdir(parents=True, exist_ok=True)
     bundle_path = cache_root / name
     executable_name = f"{name}.exe" if os.name == "nt" else name
@@ -44,7 +45,7 @@ def binary_path(name: str) -> Path:
         shutil.rmtree(bundle_path)
     if not path.exists():
         archive_name = f"{name}.zip"
-        url = f"https://github.com/{REPOSITORY}/releases/latest/download/{archive_name}"
+        url = f"https://github.com/{REPOSITORY}/releases/download/{RELEASE_TAG}/{archive_name}"
         temporary_path = cache_root / f"{archive_name}.part"
         temporary_bundle = cache_root / f".{name}.tmp"
 
