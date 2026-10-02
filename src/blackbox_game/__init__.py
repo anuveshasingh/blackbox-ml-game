@@ -13,20 +13,8 @@ __init__.py — Public API for blackbox_game.
 from __future__ import annotations
 
 from typing import Union
-import numpy as np
-import pandas as pd
 
 from .puzzles    import get_puzzle, list_puzzles, PUZZLE_REGISTRY
-from .generator  import generate_dataset, evaluate_points
-from .transforms import (
-    apply_transform, apply_binary_transform,
-    list_transforms, list_binary_transforms,
-)
-from .evaluator  import (
-    build_feature_matrix,
-    evaluate_linear_regression, evaluate_decision_tree,
-    compare_models as _compare_models_raw,
-)
 from .scoring    import (
     PlayerSession, compute_score, check_fuzzy_match,
     CORRECT_R2_THRESHOLD, CORRECT_ACCURACY_THRESHOLD,
@@ -34,7 +22,29 @@ from .scoring    import (
 )
 from .hints      import get_explanation
 from .models     import Puzzle, FunctionSpec
-from .evaluator  import predict_model
+
+
+def __getattr__(name: str):
+    """Load numerical and model modules only when their API is requested."""
+    if name in {"generate_dataset", "evaluate_points"}:
+        from . import generator
+        value = getattr(generator, name)
+    elif name in {
+        "apply_transform", "apply_binary_transform",
+        "list_transforms", "list_binary_transforms",
+    }:
+        from . import transforms
+        value = getattr(transforms, name)
+    elif name in {
+        "build_feature_matrix", "evaluate_linear_regression",
+        "evaluate_decision_tree", "predict_model",
+    }:
+        from . import evaluator
+        value = getattr(evaluator, name)
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    globals()[name] = value
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +90,14 @@ def evaluate_submission(
         puzzle_id, model, is_correct, is_fuzzy, r2/accuracy, mse,
         score_result, message, session, [explanation if correct]
     """
+    import numpy as np
+    import pandas as pd
+    from .evaluator import (
+        build_feature_matrix, evaluate_decision_tree,
+        evaluate_linear_regression,
+    )
+    from .generator import generate_dataset
+
     puzzle = get_puzzle(puzzle_id)
 
     if session is None:
@@ -171,13 +189,16 @@ def compare_models(
 
     Useful for teaching why one model is better than another.
     """
+    from .evaluator import build_feature_matrix, compare_models as compare_models_raw
+    from .generator import generate_dataset
+
     puzzle  = get_puzzle(puzzle_id)
     dataset = generate_dataset(puzzle, n_samples=n_samples, seed=seed)
     X_df    = dataset["X"]
     y       = dataset["y"]
     X_feat  = build_feature_matrix(X_df, features)
     task    = "classification" if puzzle.function.type == "circle_classify" else "regression"
-    return _compare_models_raw(X_feat, y, task=task)
+    return compare_models_raw(X_feat, y, task=task)
 
 
 __all__ = [

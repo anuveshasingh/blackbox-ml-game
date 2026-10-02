@@ -58,19 +58,12 @@ import sys
 import textwrap
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-
 # ── Make the package importable even without `pip install -e .` ──────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from blackbox_game import (
-    list_puzzles, get_puzzle, generate_dataset,
-    evaluate_submission, list_transforms, list_binary_transforms,
-    PlayerSession, POWER_MAP,
-    evaluate_points, build_feature_matrix, predict_model,
+    list_puzzles, get_puzzle, PlayerSession, POWER_MAP,
 )
-from blackbox_game.puzzles import get_puzzle
 
 
 # ── ANSI colours (VS Code terminal supports these) ────────────────────────
@@ -141,6 +134,8 @@ def cmd_show(args):
     except KeyError as e:
         print(_r(str(e)))
         sys.exit(1)
+
+    from blackbox_game import generate_dataset, list_binary_transforms, list_transforms
 
     dataset = generate_dataset(puzzle, n_samples=100, seed=42)
     X = dataset["X"]
@@ -213,6 +208,8 @@ def cmd_show(args):
 # ── Command: transforms ───────────────────────────────────────────────────
 
 def cmd_transforms(args):
+    from blackbox_game import list_binary_transforms, list_transforms
+
     print(f"\n{_b('Unary transforms')} — use as \"transform:column\" in your features list\n")
     print(f"  {'Key':<18} {'Description':<28} Power")
     print(SEP)
@@ -324,6 +321,8 @@ def cmd_submit(args):
         print(_y("No submissions to evaluate. Fill in the 'features' fields first."))
         sys.exit(0)
 
+    from blackbox_game import evaluate_submission
+
     # Evaluate
     print(f"\n{SEP2}")
     print(f"  {_b('Blackbox ML Game')} — Submission Results")
@@ -429,8 +428,10 @@ def cmd_submit(args):
     print()
 
 
-def _read_points(path: str, puzzle) -> pd.DataFrame:
+def _read_points(path: str, puzzle):
     """Read one whitespace- or comma-separated input row per line."""
+    import pandas as pd
+
     rows = []
     with open(path) as handle:
         for line_number, raw_line in enumerate(handle, 1):
@@ -504,11 +505,13 @@ def _points_output_path(input_path: str, puzzle_id: str, suffix: str) -> Path:
 
 
 def _plot_output(
-    data: pd.DataFrame,
+    data,
     csv_path: Path,
     kind: str,
 ) -> Path:
     """Save a non-interactive plot beside a generated CSV."""
+    import numpy as np
+
     matplotlib_cache = Path.home() / ".cache" / "blackbox-ml-game" / "matplotlib"
     matplotlib_cache.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
@@ -554,6 +557,8 @@ def _plot_output(
 
 def cmd_points(args):
     try:
+        from blackbox_game import evaluate_points
+
         puzzle = get_puzzle(_resolve_puzzle_id(args.puzzle_id))
         points = _read_points(args.input, puzzle)
         result = evaluate_points(puzzle, points, include_noise=not args.no_noise)
@@ -572,6 +577,9 @@ def cmd_points(args):
 
 def cmd_residuals(args):
     try:
+        from blackbox_game import evaluate_points
+        from blackbox_game.evaluator import build_feature_matrix, predict_model
+
         puzzle = get_puzzle(_resolve_puzzle_id(args.puzzle_id))
         points = _read_points(args.input, puzzle)
         result = evaluate_points(puzzle, points, include_noise=not args.no_noise)
