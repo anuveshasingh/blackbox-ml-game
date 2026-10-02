@@ -18,7 +18,7 @@ jobs:
         include:
           - runner: macos-14
             asset: blackbox-ml-game-macos-arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             asset: blackbox-ml-game-macos-x86_64
           - runner: windows-latest
             asset: blackbox-ml-game-windows-x86_64
