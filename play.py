@@ -23,7 +23,7 @@ QUICK START
 -----------
   1.  pip install -e .
   2.  python play.py list
-  3.  python play.py show square_01
+    3.  python play.py show puzzle_03
   4.  python play.py template          # creates my_answers.json
   5.  # edit my_answers.json with your answers
   6.  python play.py submit my_answers.json
@@ -37,15 +37,15 @@ INPUT FILE FORMAT
 
   Single submission:
     {
-        "puzzle_id": "square_01",
+        "puzzle_id": "puzzle_03",
         "model":     "linear_regression",
         "features":  ["square:x"]
     }
 
   Multiple submissions:
     [
-        { "puzzle_id": "line_01",   "model": "linear_regression", "features": ["identity:x"] },
-        { "puzzle_id": "square_01", "model": "linear_regression", "features": ["square:x"] }
+        { "puzzle_id": "puzzle_01", "model": "linear_regression", "features": ["identity:x"] },
+        { "puzzle_id": "puzzle_03", "model": "linear_regression", "features": ["square:x"] }
     ]
 """
 
@@ -56,6 +56,10 @@ import json
 import os
 import sys
 import textwrap
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 # ── Make the package importable even without `pip install -e .` ──────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -64,7 +68,9 @@ from blackbox_game import (
     list_puzzles, get_puzzle, generate_dataset,
     evaluate_submission, list_transforms, list_binary_transforms,
     PlayerSession, POWER_MAP,
+    evaluate_points, build_feature_matrix, predict_model,
 )
+from blackbox_game.puzzles import get_puzzle
 
 
 # ── ANSI colours (VS Code terminal supports these) ────────────────────────
@@ -83,8 +89,11 @@ def _c(s):  return f"{_CYAN}{s}{_RESET}"
 def _r(s):  return f"{_RED}{s}{_RESET}"
 def _d(s):  return f"{_DIM}{s}{_RESET}"
 
+
 SEP  = _d("─" * 64)
 SEP2 = _d("═" * 64)
+_PLOT_EPSILON = 1.0
+_PLOT_SEED = 42
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -113,7 +122,7 @@ def cmd_list(args):
     print(SEP)
     for p in puzzles:
         print(
-            f"  {_c(p['id']):<31} "
+            f"  {_c(_puzzle_label(p['id'])):<31} "
             f"{_diff_label(p['difficulty']):<25} "
             f"{_d(p['category']):<18} "
             f"{p['title']}"
@@ -126,7 +135,7 @@ def cmd_list(args):
 # ── Command: show ─────────────────────────────────────────────────────────
 
 def cmd_show(args):
-    puzzle_id = args.puzzle_id
+    puzzle_id = _resolve_puzzle_id(args.puzzle_id)
     try:
         puzzle = get_puzzle(puzzle_id)
     except KeyError as e:
@@ -136,6 +145,14 @@ def cmd_show(args):
     dataset = generate_dataset(puzzle, n_samples=100, seed=42)
     X = dataset["X"]
     y = dataset["y"]
+    base_plot = None
+    if args.plot:
+        _ensure_output_dirs()
+        base_plot = _plot_output(
+            X.assign(y=y),
+            _puzzle_output_dir(puzzle_id) / f"{_puzzle_label(puzzle_id)}_base.csv",
+            "points",
+        )
 
     diff_label = {1: "Beginner", 2: "Intermediate", 3: "Challenge"}.get(
         puzzle.difficulty, str(puzzle.difficulty)
@@ -143,7 +160,7 @@ def cmd_show(args):
 
     print(f"\n{SEP2}")
     print(f"  {_b(puzzle.title)}  [{_diff_label(puzzle.difficulty)} · {_d(puzzle.category)}]")
-    print(f"  ID: {_c(puzzle_id)}")
+    print(f"  ID: {_c(_puzzle_label(puzzle_id))}")
     print(SEP2)
     print()
     print(_b("  Description"))
@@ -188,6 +205,8 @@ def cmd_show(args):
     print(SEP)
     print(_d("  Write your answer in my_answers.json and run:"))
     print(_d("  python play.py submit my_answers.json"))
+    if base_plot:
+        print(f"  Base plot written: {_b(str(base_plot))}")
     print()
 
 
@@ -227,7 +246,7 @@ def cmd_template(args):
     template = []
     for p in puzzles:
         entry = {
-            "puzzle_id": p["id"],
+            "puzzle_id": _puzzle_label(p["id"]),
             "model":     "linear_regression",
             "features":  ["???"],
             "_title":    p["title"],
@@ -311,19 +330,21 @@ def cmd_submit(args):
     print(SEP2)
     print()
 
+
     total_score  = 0
     correct_count = 0
     fuzzy_count   = 0
 
     for sub in submissions:
-        pid      = sub["puzzle_id"]
+        public_pid = sub["puzzle_id"]
+        pid      = _resolve_puzzle_id(public_pid)
         model    = sub["model"]
         features = sub["features"]
 
         try:
             puzzle = get_puzzle(pid)
         except KeyError:
-            print(f"  {_r('✗')} {_r(pid)} — unknown puzzle ID, skipped.")
+            print(f"  {_r('✗')} {_r(public_pid)} — unknown puzzle ID, skipped.")
             print()
             continue
 
@@ -362,7 +383,7 @@ def cmd_submit(args):
 
         # Puzzle line
         print(f"  {icon}  {_b(puzzle.title):<40} {_d(f'[{diff_label}]')}")
-        print(f"     ID: {_c(pid):<25} model: {model}")
+        print(f"     ID: {_c(_puzzle_label(pid)):<25} model: {model}")
         print(f"     features: {json.dumps(features)}")
 
         if error:
@@ -408,6 +429,167 @@ def cmd_submit(args):
     print()
 
 
+def _read_points(path: str, puzzle) -> pd.DataFrame:
+    """Read one whitespace- or comma-separated input row per line."""
+    rows = []
+    with open(path) as handle:
+        for line_number, raw_line in enumerate(handle, 1):
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            values = [value for value in line.replace(",", " ").split() if value]
+            try:
+                row = [float(value) for value in values]
+            except ValueError as exc:
+                if not rows and [value.lower() for value in values] == puzzle.input_features:
+                    continue
+                raise ValueError(f"Line {line_number} contains a non-numeric value.") from exc
+            if len(row) != len(puzzle.input_features):
+                expected = ", ".join(puzzle.input_features)
+                raise ValueError(
+                    f"Line {line_number} has {len(row)} values; expected {len(puzzle.input_features)} ({expected})."
+                )
+            rows.append(row)
+
+    if not rows:
+        raise ValueError("Input file contains no data rows.")
+    return pd.DataFrame(rows, columns=puzzle.input_features)
+
+
+def _output_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path.cwd() / "outputs"
+    return Path(__file__).resolve().parent / "outputs"
+
+
+def _puzzle_number(puzzle_id: str) -> int:
+    for number, puzzle in enumerate(list_puzzles(), 1):
+        if puzzle["id"] == puzzle_id:
+            return number
+    raise KeyError(f"Unknown puzzle ID: {puzzle_id}")
+
+
+def _puzzle_label(puzzle_id: str) -> str:
+    return f"puzzle_{_puzzle_number(puzzle_id):02d}"
+
+
+def _resolve_puzzle_id(identifier: str) -> str:
+    if identifier.startswith("puzzle_"):
+        try:
+            number = int(identifier.removeprefix("puzzle_"))
+        except ValueError:
+            return identifier
+        puzzles = list_puzzles()
+        if 1 <= number <= len(puzzles):
+            return puzzles[number - 1]["id"]
+    return identifier
+
+
+def _puzzle_output_dir(puzzle_id: str) -> Path:
+    return _output_root() / _puzzle_label(puzzle_id)
+
+
+def _ensure_output_dirs() -> Path:
+    root = _output_root()
+    root.mkdir(exist_ok=True)
+    for number in range(1, len(list_puzzles()) + 1):
+        (root / f"puzzle_{number:02d}").mkdir(exist_ok=True)
+    return root
+
+
+def _points_output_path(input_path: str, puzzle_id: str, suffix: str) -> Path:
+    source = Path(input_path)
+    label = _puzzle_label(puzzle_id)
+    return _ensure_output_dirs() / label / f"{source.stem}_{label}_{suffix}.csv"
+
+
+def _plot_output(
+    data: pd.DataFrame,
+    csv_path: Path,
+    kind: str,
+) -> Path:
+    """Save a non-interactive plot beside a generated CSV."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    plot_path = csv_path.with_suffix(".png")
+    rng = np.random.default_rng(_PLOT_SEED)
+    plot_noise = lambda size: rng.uniform(-_PLOT_EPSILON, _PLOT_EPSILON, size)
+    if kind == "points":
+        input_columns = [
+            column for column in data.columns
+            if column not in {"y", "prediction", "residual"}
+        ]
+        figure, axes = plt.subplots(
+            len(input_columns), 1,
+            figsize=(7, max(4, 3.5 * len(input_columns))),
+            squeeze=False,
+        )
+        plotted_y = data["y"].to_numpy() + plot_noise(len(data))
+        for axis, column in zip(axes.flat, input_columns):
+            axis.scatter(data[column], plotted_y, alpha=0.7, s=24)
+            axis.set_xlabel(column)
+            axis.set_ylabel("y")
+            axis.set_title(f"{column} vs y")
+            axis.grid(True, alpha=0.3)
+    else:
+        figure, axis = plt.subplots(figsize=(7, 4))
+        plotted_residual = data["residual"].to_numpy() + plot_noise(len(data))
+        axis.scatter(data["prediction"], plotted_residual, alpha=0.7, s=24)
+        axis.axhline(0.0, color="black", linestyle="--", linewidth=1)
+        axis.set_xlabel("prediction")
+        axis.set_ylabel("residual (y - prediction) + plot noise")
+        axis.set_title(f"Residuals vs prediction (epsilon <= {_PLOT_EPSILON:g})")
+        axis.grid(True, alpha=0.3)
+
+    figure.tight_layout()
+    figure.savefig(plot_path, dpi=150)
+    plt.close(figure)
+    return plot_path
+
+
+def cmd_points(args):
+    try:
+        puzzle = get_puzzle(_resolve_puzzle_id(args.puzzle_id))
+        points = _read_points(args.input, puzzle)
+        result = evaluate_points(puzzle, points, include_noise=not args.no_noise)
+        output = Path(args.output) if args.output else _points_output_path(args.input, puzzle.id, "output")
+        values = result["X"].assign(y=result["y"])
+        values.to_csv(output, index=False)
+        plot = _plot_output(values, output, "points") if args.plot else None
+    except (OSError, ValueError, KeyError) as exc:
+        print(_r(f"Error: {exc}"))
+        sys.exit(1)
+    print(f"\n{_g('✓')} Points evaluated: {_b(str(output))}")
+    print(f"  {len(result['X'])} rows, columns: {', '.join(result['X'].columns)} + y\n")
+    if plot:
+        print(f"  Plot written: {_b(str(plot))}\n")
+
+
+def cmd_residuals(args):
+    try:
+        puzzle = get_puzzle(_resolve_puzzle_id(args.puzzle_id))
+        points = _read_points(args.input, puzzle)
+        result = evaluate_points(puzzle, points, include_noise=not args.no_noise)
+        X_feat = build_feature_matrix(result["X"], args.features)
+        task = "classification" if puzzle.function.type == "circle_classify" else "regression"
+        predictions = predict_model(X_feat, result["y"], args.model, task=task)
+        output = Path(args.output) if args.output else _points_output_path(args.input, puzzle.id, "residuals")
+        residuals = result["X"].assign(
+            y=result["y"], prediction=predictions, residual=result["y"] - predictions
+        )
+        residuals.to_csv(output, index=False)
+        plot = _plot_output(residuals, output, "residuals") if args.plot else None
+    except (OSError, ValueError, KeyError) as exc:
+        print(_r(f"Error: {exc}"))
+        sys.exit(1)
+    print(f"\n{_g('✓')} Residuals written: {_b(str(output))}")
+    print(f"  {len(residuals)} rows, model: {args.model}\n")
+    if plot:
+        print(f"  Plot written: {_b(str(plot))}\n")
+
+
 # ── Argument parser ───────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -425,7 +607,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # show
     p_show = sub.add_parser("show", help="Show a puzzle and its data")
-    p_show.add_argument("puzzle_id", help="Puzzle ID (e.g. square_01)")
+    p_show.add_argument("puzzle_id", help="Puzzle ID (e.g. puzzle_03)")
+    p_show.add_argument("--plot", action="store_true",
+                        help="Also save the generated points as <puzzle_id>_base.png")
 
     # transforms
     sub.add_parser("transforms", help="List all available transforms")
@@ -438,6 +622,25 @@ def build_parser() -> argparse.ArgumentParser:
     # submit
     p_sub = sub.add_parser("submit", help="Submit and score your answers file")
     p_sub.add_argument("answers_file", help="Path to your JSON answers file")
+
+    # points and residuals
+    for command, handler_help in (
+        ("points", "Evaluate a puzzle at user-supplied input points"),
+        ("residuals", "Write residuals for a model fitted to supplied points"),
+    ):
+        point_parser = sub.add_parser(command, help=handler_help)
+        point_parser.add_argument("puzzle_id", help="Puzzle ID (e.g. puzzle_03)")
+        point_parser.add_argument("--input", required=True, help="Text file with one input point per line")
+        point_parser.add_argument("--output", help="CSV path (default: input stem plus puzzle ID and command)")
+        point_parser.add_argument("--no-noise", action="store_true",
+                                  help="Do not add the puzzle's configured output noise")
+        point_parser.add_argument("--plot", action="store_true",
+                      help="Also save a PNG plot beside the CSV")
+        if command == "residuals":
+            point_parser.add_argument("--features", nargs="+", required=True,
+                                      help="Feature specifications, e.g. identity:x sin:x")
+            point_parser.add_argument("--model", choices=["linear_regression", "decision_tree"],
+                                      default="linear_regression")
 
     return parser
 
@@ -452,6 +655,8 @@ def main():
         "transforms": cmd_transforms,
         "template":   cmd_template,
         "submit":     cmd_submit,
+        "points":     cmd_points,
+        "residuals":  cmd_residuals,
     }
 
     if args.command is None:

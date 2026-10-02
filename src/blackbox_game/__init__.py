@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from .puzzles    import get_puzzle, list_puzzles, PUZZLE_REGISTRY
-from .generator  import generate_dataset
+from .generator  import generate_dataset, evaluate_points
 from .transforms import (
     apply_transform, apply_binary_transform,
     list_transforms, list_binary_transforms,
@@ -34,6 +34,7 @@ from .scoring    import (
 )
 from .hints      import get_explanation
 from .models     import Puzzle, FunctionSpec
+from .evaluator  import predict_model
 
 
 # ---------------------------------------------------------------------------
