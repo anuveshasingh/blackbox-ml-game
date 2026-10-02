@@ -4,6 +4,14 @@ A command-line puzzle game for discovering hidden relationships between input va
 
 ## Installation
 
+Install `uv` once. On macOS with Homebrew:
+
+```bash
+brew install uv
+```
+
+On Windows or Linux, follow the installer at <https://docs.astral.sh/uv/getting-started/installation/>.
+
 Clone the repository and enter it:
 
 ```bash
@@ -11,26 +19,13 @@ git clone https://github.com/anuveshasingh/blackbox-ml-game.git
 cd blackbox-ml-game
 ```
 
-Create and activate a project-local Python environment:
+This single command creates the environment and installs all dependencies automatically:
 
 ```bash
-python3 -m venv .compvenv
-source .compvenv/bin/activate
-python -m pip install -e .
+uv run python play.py list
 ```
 
-Verify the installation:
-
-```bash
-python play.py list
-```
-
-When you return to the project later, activate the environment again:
-
-```bash
-cd blackbox-ml-game
-source .compvenv/bin/activate
-```
+No virtual-environment activation is needed. Later commands use the same `uv run python play.py ...` prefix.
 
 ## Puzzle Groups
 
@@ -45,10 +40,10 @@ Puzzles are identified publicly by number so their names do not reveal the under
 List the catalogue at any time:
 
 ```bash
-python play.py list
-python play.py list --difficulty 1
-python play.py list --difficulty 2
-python play.py list --difficulty 3
+uv run python play.py list
+uv run python play.py list --difficulty 1
+uv run python play.py list --difficulty 2
+uv run python play.py list --difficulty 3
 ```
 
 ## Playing A Puzzle
@@ -56,7 +51,7 @@ python play.py list --difficulty 3
 Start with a puzzle description and a 100-row sample:
 
 ```bash
-python play.py show puzzle_08
+uv run python play.py show puzzle_08
 ```
 
 This prints the puzzle description, input columns, sample rows, and the transformations available for that puzzle.
@@ -64,7 +59,7 @@ This prints the puzzle description, input columns, sample rows, and the transfor
 Create the base plot for the generated sample:
 
 ```bash
-python play.py show puzzle_08 --plot
+uv run python play.py show puzzle_08 --plot
 ```
 
 The PNG is written to:
@@ -76,7 +71,7 @@ outputs/puzzle_08/puzzle_08_base.png
 List all transformation names and binary operations:
 
 ```bash
-python play.py transforms
+uv run python play.py transforms
 ```
 
 A feature such as `square:x1` means that the model receives $x1^2$ rather than the raw `x1`. A binary feature such as `{"binary": "multiply", "a": "x1", "b": "x2"}` means $x1 \times x2$.
@@ -86,7 +81,7 @@ A feature such as `square:x1` means that the model receives $x1^2$ rather than t
 Use `points` when you want to evaluate the hidden function at your own input rows:
 
 ```bash
-python play.py points puzzle_17 --input points.txt
+uv run python play.py points puzzle_17 --input points.txt
 ```
 
 The CSV is written under:
@@ -98,7 +93,7 @@ outputs/puzzle_17/<input-name>_puzzle_17_output.csv
 Add `--plot` to create a PNG beside the CSV:
 
 ```bash
-python play.py points puzzle_17 --input points.txt --plot
+uv run python play.py points puzzle_17 --input points.txt --plot
 ```
 
 ### Input File Format
@@ -139,7 +134,7 @@ Do not add a `y` column. The program calculates `y`. Do not add transformed colu
 Use `residuals` to fit a model to your supplied points and export the observed output, model prediction, and residual:
 
 ```bash
-python play.py residuals puzzle_08 \
+uv run python play.py residuals puzzle_08 \
   --input points.txt \
   --features identity:x sin:x \
   --model linear_regression
@@ -160,7 +155,7 @@ residual = y - prediction
 Add `--plot` to create `..._residuals.png` beside the CSV:
 
 ```bash
-python play.py residuals puzzle_08 \
+uv run python play.py residuals puzzle_08 \
   --input points.txt \
   --features identity:x sin:x \
   --model linear_regression \
@@ -170,7 +165,7 @@ python play.py residuals puzzle_08 \
 Use `--no-noise` with `points` or `residuals` when you need the deterministic function rather than the generated noisy output:
 
 ```bash
-python play.py points puzzle_08 --input points.txt --no-noise
+uv run python play.py points puzzle_08 --input points.txt --no-noise
 ```
 
 ## Noise
@@ -190,10 +185,10 @@ This repository is the game engine and exploration tool. Do not create or send a
 ## Common Commands
 
 ```bash
-python play.py list
-python play.py show puzzle_08
-python play.py show puzzle_08 --plot
-python play.py transforms
-python play.py points puzzle_17 --input points.txt --plot
-python play.py residuals puzzle_08 --input points.txt --features identity:x sin:x --plot
+uv run python play.py list
+uv run python play.py show puzzle_08
+uv run python play.py show puzzle_08 --plot
+uv run python play.py transforms
+uv run python play.py points puzzle_17 --input points.txt --plot
+uv run python play.py residuals puzzle_08 --input points.txt --features identity:x sin:x --plot
 ```
