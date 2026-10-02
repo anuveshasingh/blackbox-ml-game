@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 import stat
 import subprocess
 import sys
 import urllib.request
+from zipfile import ZipFile
 from pathlib import Path
 
 REPOSITORY = "anuveshasingh/blackbox-ml-game"
@@ -33,10 +35,14 @@ def asset_name() -> str:
 def binary_path(name: str) -> Path:
     cache_root = Path.home() / ".cache" / "blackbox-ml-game"
     cache_root.mkdir(parents=True, exist_ok=True)
-    path = cache_root / name
+    bundle_path = cache_root / name
+    executable_name = f"{name}.exe" if os.name == "nt" else name
+    path = bundle_path / executable_name
     if not path.exists():
-        url = f"https://github.com/{REPOSITORY}/releases/latest/download/{name}"
-        temporary_path = path.with_name(f"{path.name}.part")
+        archive_name = f"{name}.zip"
+        url = f"https://github.com/{REPOSITORY}/releases/latest/download/{archive_name}"
+        temporary_path = cache_root / f"{archive_name}.part"
+        temporary_bundle = cache_root / f".{name}.tmp"
 
         def report_progress(block_count: int, block_size: int, total_size: int) -> None:
             downloaded = block_count * block_size
@@ -51,10 +57,17 @@ def binary_path(name: str) -> Path:
         print(f"Downloading the game for {platform.system()} {platform.machine()}...", flush=True)
         try:
             urllib.request.urlretrieve(url, temporary_path, reporthook=report_progress)
-            temporary_path.replace(path)
+            shutil.rmtree(temporary_bundle, ignore_errors=True)
+            temporary_bundle.mkdir()
+            with ZipFile(temporary_path) as archive:
+                archive.extractall(temporary_bundle)
+            shutil.rmtree(bundle_path, ignore_errors=True)
+            temporary_bundle.replace(bundle_path)
+            temporary_path.unlink(missing_ok=True)
             print("", flush=True)
         except Exception:
             temporary_path.unlink(missing_ok=True)
+            shutil.rmtree(temporary_bundle, ignore_errors=True)
             raise
         if os.name != "nt":
             path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

@@ -39,17 +39,30 @@ jobs:
       - name: Install dependencies
         run: python -m pip install . pyinstaller
 
-      - name: Build executable
+      - name: Build executable bundle
         shell: bash
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile \
+          python -m PyInstaller --noconfirm --clean --onedir \
             --name "${{ matrix.asset }}" play.py
+          ASSET_NAME="${{ matrix.asset }}" python - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+
+          asset = os.environ["ASSET_NAME"]
+          root = Path("dist") / asset
+          archive = Path("dist") / f"{asset}.zip"
+          with ZipFile(archive, "w", ZIP_DEFLATED) as output:
+              for file in root.rglob("*"):
+                  if file.is_file():
+                      output.write(file, file.relative_to("dist"))
+          PY
 
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: dist/${{ matrix.asset }}*
+          path: dist/${{ matrix.asset }}.zip
 
   release:
     name: Publish release assets
