@@ -1,0 +1,68 @@
+name: Build game binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            asset: blackbox-ml-game-macos-arm64
+          - runner: macos-13
+            asset: blackbox-ml-game-macos-x86_64
+          - runner: windows-latest
+            asset: blackbox-ml-game-windows-x86_64
+          - runner: ubuntu-latest
+            asset: blackbox-ml-game-linux-x86_64
+
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: preesha
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install . pyinstaller
+
+      - name: Build executable
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile \
+            --name "${{ matrix.asset }}" play.py
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}*
+
+  release:
+    name: Publish release assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download executables
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" release-assets/* --title "${GITHUB_REF_NAME}" --generate-notes
