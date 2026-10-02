@@ -198,8 +198,7 @@ def cmd_show(args):
     print(f"    decision_tree")
     print()
     print(SEP)
-    print(_d("  Write your answer in my_answers.json and run:"))
-    print(_d("  python play.py submit my_answers.json"))
+    print(_d("  Record your result on the course leaderboard."))
     if base_plot:
         print(f"  Base plot written: {_b(str(base_plot))}")
     print()
