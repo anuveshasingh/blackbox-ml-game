@@ -509,6 +509,9 @@ def _plot_output(
     kind: str,
 ) -> Path:
     """Save a non-interactive plot beside a generated CSV."""
+    matplotlib_cache = Path.home() / ".cache" / "blackbox-ml-game" / "matplotlib"
+    matplotlib_cache.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
