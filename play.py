@@ -513,7 +513,12 @@ def _plot_output(
 
     matplotlib_cache = Path.home() / ".cache" / "blackbox-ml-game" / "matplotlib"
     matplotlib_cache.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
+    # Must be a forced assignment, not setdefault(): PyInstaller's bundled
+    # matplotlib runtime hook already sets MPLCONFIGDIR to a fresh
+    # tempfile.mkdtemp() directory before this script runs, so setdefault()
+    # is always a no-op in the frozen binary — the font cache was silently
+    # rebuilding (and being discarded) on every single launch.
+    os.environ["MPLCONFIGDIR"] = str(matplotlib_cache)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
