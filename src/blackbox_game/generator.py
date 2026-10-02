@@ -19,6 +19,7 @@ from typing import Any
 
 from .models import Puzzle, FunctionSpec
 
+FORMULA_EPSILON = 1.0
 
 # ---------------------------------------------------------------------------
 # Internal generators  (rng, n_samples, params) → (feature_dict, y_array)
@@ -288,5 +289,98 @@ def generate_dataset(
 
     if puzzle.noise_std > 0.0:
         y = y + rng.normal(0.0, puzzle.noise_std, n_samples)
+    y = y + rng.uniform(-FORMULA_EPSILON, FORMULA_EPSILON, n_samples)
 
     return {"X": pd.DataFrame(feature_dict), "y": np.array(y, dtype=float)}
+
+
+def evaluate_points(
+    puzzle: Puzzle,
+    X: pd.DataFrame,
+    seed: int = 42,
+    include_noise: bool = True,
+) -> dict:
+    """Evaluate a puzzle's hidden function at user-supplied input points.
+
+    ``X`` must contain the columns named by ``puzzle.input_features``. The
+    returned ``y`` values use the same function and optional noise model as
+    :func:`generate_dataset`, but preserve the caller's input rows.
+    """
+    missing = [column for column in puzzle.input_features if column not in X]
+    if missing:
+        raise ValueError(f"Missing input columns: {', '.join(missing)}")
+
+    values = X[puzzle.input_features].astype(float).copy()
+    if not np.isfinite(values.to_numpy()).all():
+        raise ValueError("Input points must contain only finite numbers.")
+
+    p = puzzle.function.parameters
+    fn_type = puzzle.function.type
+    columns = {name: values[name].to_numpy() for name in values.columns}
+    x = columns.get("x")
+    x1 = columns.get("x1")
+    x2 = columns.get("x2")
+    x3 = columns.get("x3")
+
+    if fn_type == "linear":
+        y = p.get("slope", 1.0) * x + p.get("intercept", 0.0)
+    elif fn_type == "quadratic":
+        y = p.get("a", 1.0) * x**2 + p.get("b", 0.0) * x + p.get("c", 0.0)
+    elif fn_type == "cubic":
+        y = p.get("a", 1.0) * x**3
+    elif fn_type == "sqrt_fn":
+        y = p.get("a", 1.0) * np.sqrt(x)
+    elif fn_type == "log_fn":
+        y = p.get("a", 1.0) * np.log(x) + p.get("b", 0.0)
+    elif fn_type == "reciprocal_fn":
+        y = p.get("a", 10.0) / x
+    elif fn_type == "abs_fn":
+        y = p.get("a", 1.0) * np.abs(x)
+    elif fn_type == "cosine_fn":
+        y = p.get("amplitude", 1.0) * np.cos(p.get("freq", 1.0) * x)
+    elif fn_type == "polynomial2_fn":
+        y = p.get("a", 1.0) * x**2 + p.get("b", -3.0) * x
+    elif fn_type == "phase_sum":
+        y = np.sin(x) + np.cos(x)
+    elif fn_type == "sinusoidal":
+        y = p.get("amplitude", 1.0) * np.sin(2 * np.pi * x / p.get("period", 7.0)) + p.get("offset", 0.0)
+    elif fn_type == "sinusoidal_sum":
+        y = p.get("a1", 1.0) * np.sin(p.get("f1", 1.0) * x) + p.get("a2", 0.5) * np.sin(p.get("f2", 3.0) * x)
+    elif fn_type == "almost_linear":
+        y = p.get("slope", 1.0) * x + p.get("amplitude", 0.5) * np.sin(x)
+    elif fn_type == "piecewise_flat":
+        threshold = p.get("threshold", 5.0)
+        slope = p.get("slope", 2.0)
+        y = np.where(x < threshold, slope * x, slope * threshold)
+    elif fn_type == "boss_piecewise":
+        t1, t2 = p.get("t1", 3.0), p.get("t2", 7.0)
+        s1, c1 = p.get("slope1", 2.0), p.get("c1", 0.0)
+        s2 = p.get("slope2", 1.0)
+        c2 = (s1 - s2) * t1 + c1
+        s3 = p.get("slope3", 0.5)
+        c3 = (s2 - s3) * t2 + c2
+        y = np.where(x < t1, s1 * x + c1, np.where(x < t2, s2 * x + c2, s3 * x + c3))
+    elif fn_type == "product_2d":
+        y = x1 * x2
+    elif fn_type == "ratio_2d":
+        y = x1 / x2
+    elif fn_type == "distance_2d":
+        y = np.sqrt(x1**2 + x2**2)
+    elif fn_type == "circle_classify":
+        y = (x1**2 + x2**2 < p.get("radius", 4.0) ** 2).astype(float)
+    elif fn_type == "linear_distractor":
+        y = p.get("slope", 3.0) * x1 + p.get("intercept", 0.0)
+    elif fn_type == "multi_transform":
+        y = p.get("a", 1.0) * np.sin(x1) + p.get("b", 1.0) * x2**2 + p.get("c", 3.0) * x3
+    elif fn_type == "boss_multi":
+        y = x1 * x2 + p.get("c", 2.0) * x3
+    else:
+        raise ValueError(f"Unknown function type '{fn_type}'.")
+
+    y = np.asarray(y, dtype=float)
+    if include_noise:
+        rng = np.random.default_rng(seed)
+        if puzzle.noise_std > 0.0:
+            y = y + rng.normal(0.0, puzzle.noise_std, len(values))
+        y = y + rng.uniform(-FORMULA_EPSILON, FORMULA_EPSILON, len(values))
+    return {"X": values, "y": y}

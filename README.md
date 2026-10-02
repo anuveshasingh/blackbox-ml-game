@@ -24,6 +24,8 @@ You can see the data. You cannot see the function. Your job is to:
 The game teaches **feature engineering** and model selection through discovery.  
 Target audience: first-year IIT Delhi students 
 
+The exact answer key is documented separately in [GROUND_TRUTH.md](GROUND_TRUTH.md).
+
 ---
 
 ## Quick Start (after cloning)
@@ -36,7 +38,10 @@ pip install -e .
 python play.py list
 
 # 3. Look at a puzzle and its data
-python play.py show square_01
+python play.py show puzzle_03
+
+# 3a. Also save the generated data plot under outputs/puzzle_03/puzzle_03_base.png
+python play.py show puzzle_03 --plot
 
 # 4. See all available transformations
 python play.py transforms
@@ -48,6 +53,53 @@ python play.py template
 python play.py submit my_answers.json
 ```
 
+### Evaluate custom points
+
+You can evaluate your own input points instead of using randomly generated data. Put one point per line in a text file, with values in the puzzle's input-feature order. Spaces or commas may separate values; a header and lines beginning with `#` are also allowed.
+
+For a puzzle with `x1` and `x2` inputs, `points.txt` could contain:
+
+```text
+x1,x2
+0,1
+2,3
+-1,4
+```
+
+Evaluate the hidden function and write a CSV containing the input columns and `y`:
+
+```bash
+python play.py points puzzle_17 --input points.txt
+```
+
+By default this creates an output under `outputs/puzzle_17/` for `distance_01`. Add `--plot` to also create the neighboring PNG:
+
+```bash
+python play.py points puzzle_17 --input points.txt --plot
+```
+
+To fit a model to the supplied points and export `y`, `prediction`, and `residual` (`y - prediction`):
+
+```bash
+python play.py residuals puzzle_17 --input points.txt \
+    --features square:x1 square:x2 --plot
+```
+
+This creates a residual CSV and, with `--plot`, the neighboring PNG under the matching `outputs/puzzle_XX/` folder. The generic puzzle number prevents the puzzle name from being revealed by output filenames. Use `--output FILE` with either command to choose a different CSV path. Use `--no-noise` when evaluating a puzzle whose configured output includes noise and you want the underlying noiseless function.
+
+Generated formula outputs and plots use reproducible uniform noise bounded by `epsilon = 1.0` with NumPy seed `42`. CSV values include formula noise; plot jitter is visual noise applied on top of those values.
+
+### Build a native binary
+
+Install the optional binary tooling and build the CLI executable:
+
+```bash
+python -m pip install -e ".[binary]"
+./scripts/build_binary.sh
+```
+
+The executable is written to `dist/blackbox-ml-game`. PyInstaller binaries are native to the operating system and CPU used to build them: a macOS binary will not run unchanged on Windows or Linux. Build separately on each target platform; use the Python installation instructions above for a cross-platform distribution.
+
 ---
 
 ## How the Game Works
@@ -55,13 +107,14 @@ python play.py submit my_answers.json
 ### Step 1 — Read the puzzle
 
 ```bash
-python play.py show square_01
+python play.py show puzzle_03
 ```
 
 You'll see:
 - A cryptic description (no spoilers)
 - 12 rows of sample data
 - The list of transforms you're allowed to use
+- With `--plot`, a base scatter plot saved under `outputs/puzzle_XX/puzzle_XX_base.png`
 
 ### Step 2 — Fill in your answer
 
@@ -69,11 +122,15 @@ Open `my_answers.json`. Find the puzzle entry and fill in the `"model"` and `"fe
 
 ```json
 {
-  "puzzle_id": "square_01",
+    "puzzle_id": "puzzle_03",
   "model": "linear_regression",
   "features": ["square:x"]
 }
 ```
+
+`square:x1` means: take the input column `x1`, square every value, and give
+those transformed values to the model. For example, `x1 = -3, 2` becomes
+`square:x1 = 9, 4`. It is useful when the relationship depends on `x1²`.
 
 ### Step 3 — Submit
 
@@ -85,7 +142,7 @@ You'll see:
 
 ```
 ✓  The Bend in the Road          [Beginner]
-   ID: square_01                  model: linear_regression
+    ID: puzzle_03                  model: linear_regression
    features: ["square:x"]
    R² = 1.0000   score = 200
    ✓ Correct! R² = 1.0.
@@ -101,7 +158,7 @@ The answers file is a **JSON file** — either a single object or an array of ob
 ### Single submission
 ```json
 {
-    "puzzle_id": "square_01",
+    "puzzle_id": "puzzle_03",
     "model":     "linear_regression",
     "features":  ["square:x"]
 }
@@ -111,17 +168,17 @@ The answers file is a **JSON file** — either a single object or an array of ob
 ```json
 [
     {
-        "puzzle_id": "line_01",
+        "puzzle_id": "puzzle_01",
         "model":     "linear_regression",
         "features":  ["identity:x"]
     },
     {
-        "puzzle_id": "square_01",
+        "puzzle_id": "puzzle_03",
         "model":     "linear_regression",
         "features":  ["square:x"]
     },
     {
-        "puzzle_id": "product_01",
+        "puzzle_id": "puzzle_14",
         "model":     "linear_regression",
         "features":  [{"binary": "multiply", "a": "x1", "b": "x2"}]
     }
@@ -257,43 +314,43 @@ Examples (correct answer is `square:x`, i.e. x²):
 
 | ID | Title | Concept |
 |----|-------|---------|
-| `line_01` | Obedient Numbers | Positive linear relationship |
-| `line_02` | The Reluctant Ascent | Negative linear relationship |
-| `square_01` | The Bend in the Road | Feature transform: x² |
-| `sqrt_01` | Momentum Decay | Feature transform: √x |
-| `log_01` | The Compressed Universe | Feature transform: log(x) |
-| `distractor_01` | Four Suspects | Identify the one useful feature |
+| `puzzle_01` | Obedient Numbers | Positive linear relationship |
+| `puzzle_02` | The Reluctant Ascent | Negative linear relationship |
+| `puzzle_03` | The Bend in the Road | Feature transform: x² |
+| `puzzle_04` | Momentum Decay | Feature transform: √x |
+| `puzzle_05` | The Compressed Universe | Feature transform: log(x) |
+| `puzzle_06` | Four Suspects | Identify the one useful feature |
 
 ### Intermediate (9 puzzles)
 
 | ID | Title | Concept |
 |----|-------|---------|
-| `almost_linear_01` | The Imposter Line | y = x + 0.5·sin(x) — use both |
-| `almost_linear_02` | Static on the Signal | Linear + periodic + noise |
-| `reciprocal_01` | Vanishing Point | Feature transform: 1/x |
-| `abs_01` | The Symmetric Grudge | Feature transform: \|x\| |
-| `cos_01` | The Quarter-Turn | Feature transform: cos(x) |
-| `periodic_01` | The Repeating Rumour | y = sin(x) — periodicity |
-| `periodic_02` | Seven Days of Nothing | y = sin(2πx/7) — weekly cycle |
-| `product_01` | The Missing Third Variable | y = x1 × x2 — interaction |
-| `ratio_01` | Speed Without Units | y = x1 / x2 — ratio feature |
+| `puzzle_07` | The Imposter Line | y = x + 0.5·sin(x) — use both |
+| `puzzle_08` | Static on the Signal | Linear + periodic + noise |
+| `puzzle_09` | Vanishing Point | Feature transform: 1/x |
+| `puzzle_10` | The Symmetric Grudge | Feature transform: \|x\| |
+| `puzzle_11` | The Quarter-Turn | Feature transform: cos(x) |
+| `puzzle_12` | The Repeating Rumour | y = sin(x) — periodicity |
+| `puzzle_13` | Seven Days of Nothing | y = sin(2πx/7) — weekly cycle |
+| `puzzle_14` | The Missing Third Variable | y = x1 × x2 — interaction |
+| `puzzle_15` | Speed Without Units | y = x1 / x2 — ratio feature |
 
 ### Challenge (10 puzzles)
 
 | ID | Title | Concept |
 |----|-------|---------|
-| `circle_01` | The Exclusion Zone | **Decision tree** — circular boundary |
-| `distance_01` | The Displacement Field | y = √(x1²+x2²) — geometry |
-| `cubic_01` | Tripling the Problem | Feature transform: x³ |
-| `boss_piecewise` | The Three Regimes | **Decision tree** — 3 regions |
-| `boss_multi` | The Hidden Tax | y = x1·x2 + 2x3 — combine lessons |
-| `boss_sin_sum` | Interfering Signals | Two superimposed frequencies |
-| `boss_multi_feat` | Chaos in Three Channels | Three different transforms |
-| `period_boss` | The Noisy Calendar | Weekly cycle + noise + distractor |
-| `polynomial_01` | The Bent Wire | y = x²−3x — needs two features |
-| `phase_01` | The Hidden Angle | y = sin(x)+cos(x) — phase shift |
+| `puzzle_16` | The Exclusion Zone | **Decision tree** — circular boundary |
+| `puzzle_17` | The Displacement Field | y = √(x1²+x2²) — geometry |
+| `puzzle_18` | Tripling the Problem | Feature transform: x³ |
+| `puzzle_19` | The Three Regimes | **Decision tree** — 3 regions |
+| `puzzle_20` | The Hidden Tax | y = x1·x2 + 2x3 — combine lessons |
+| `puzzle_21` | Interfering Signals | Two superimposed frequencies |
+| `puzzle_22` | Chaos in Three Channels | Three different transforms |
+| `puzzle_23` | The Noisy Calendar | Weekly cycle + noise + distractor |
+| `puzzle_24` | The Bent Wire | y = x²−3x — needs two features |
+| `puzzle_25` | The Hidden Angle | y = sin(x)+cos(x) — phase shift |
 
-> **Decision trees:** Only `circle_01` and `boss_piecewise` require `"model": "decision_tree"`.
+> **Decision trees:** Only `puzzle_16` and `puzzle_19` require `"model": "decision_tree"`.
 > All others use `"model": "linear_regression"`.
 
 ---

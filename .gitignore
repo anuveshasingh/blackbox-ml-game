@@ -11,9 +11,11 @@ dist/
 build/
 *.egg
 .eggs/
+outputs/
 
 # Virtual environments
 .venv/
+.compvenv/
 venv/
 env/
 

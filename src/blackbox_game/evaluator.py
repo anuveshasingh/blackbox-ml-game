@@ -116,6 +116,27 @@ def build_feature_matrix(
     return matrix
 
 
+def predict_model(
+    X_feat: np.ndarray,
+    y: np.ndarray,
+    model: str,
+    task: str = "regression",
+) -> np.ndarray:
+    """Fit a supported model and return predictions for the same rows."""
+    if model == "linear_regression":
+        estimator = LinearRegression()
+    elif model == "decision_tree" and task == "classification":
+        estimator = DecisionTreeClassifier(max_depth=_DT_MAX_DEPTH, random_state=0)
+    elif model == "decision_tree":
+        estimator = DecisionTreeRegressor(max_depth=_DT_MAX_DEPTH, random_state=0)
+    else:
+        raise ValueError(
+            f"Unknown model '{model}'. Use 'linear_regression' or 'decision_tree'."
+        )
+    estimator.fit(X_feat, y)
+    return np.asarray(estimator.predict(X_feat), dtype=float)
+
+
 def _has_nan(arr: np.ndarray) -> bool:
     return bool(np.any(~np.isfinite(arr)))
 
