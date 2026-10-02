@@ -38,6 +38,8 @@ def binary_path(name: str) -> Path:
     bundle_path = cache_root / name
     executable_name = f"{name}.exe" if os.name == "nt" else name
     path = bundle_path / executable_name
+    if bundle_path.is_file():
+        bundle_path.unlink()
     if not path.exists():
         archive_name = f"{name}.zip"
         url = f"https://github.com/{REPOSITORY}/releases/latest/download/{archive_name}"
