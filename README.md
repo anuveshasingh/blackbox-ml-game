@@ -89,17 +89,6 @@ This creates a residual CSV and, with `--plot`, the neighboring PNG under the ma
 
 Generated formula outputs and plots use reproducible uniform noise bounded by `epsilon = 1.0` with NumPy seed `42`. CSV values include formula noise; plot jitter is visual noise applied on top of those values.
 
-### Build a native binary
-
-Install the optional binary tooling and build the CLI executable:
-
-```bash
-python -m pip install -e ".[binary]"
-./scripts/build_binary.sh
-```
-
-The executable is written to `dist/blackbox-ml-game`. PyInstaller binaries are native to the operating system and CPU used to build them: a macOS binary will not run unchanged on Windows or Linux. Build separately on each target platform; use the Python installation instructions above for a cross-platform distribution.
-
 ---
 
 ## How the Game Works
