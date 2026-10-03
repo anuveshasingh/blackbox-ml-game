@@ -14,10 +14,10 @@ brew install uv
 
 Windows and Linux: install `uv` from <https://docs.astral.sh/uv/getting-started/installation/>.
 
-Clone this branch:
+Clone the repo:
 
 ```bash
-git clone --branch preesha-binaries https://github.com/anuveshasingh/blackbox-ml-game.git
+git clone https://github.com/anuveshasingh/blackbox-ml-game.git
 cd blackbox-ml-game
 ```
 
@@ -119,4 +119,4 @@ The generated equations include reproducible random noise using seed `42`. The f
 
 ## Leaderboard
 
-Use this game to explore puzzles and collect the requested result. Record your puzzle ID, model, features, and metric on the separate course leaderboard. This repository does not require player answer files.
+Use this game to explore puzzles and collect the requested result. Record your puzzle ID, model, features, and metric on the leaderboard. This repository does not require player answer files.
