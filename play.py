@@ -5,55 +5,31 @@ play.py — Blackbox ML Game  (run from the repo root)
 COMMANDS
 --------
   python play.py list [--difficulty 1|2|3]
-      List all puzzles (optionally filter by difficulty).
+      List all puzzle IDs (optionally filter by difficulty).
 
   python play.py show <puzzle_id>
-      Show a puzzle's description, input data, and available transforms.
+      Show a puzzle's description and input data.
 
   python play.py transforms
       Print all available transformation keys.
-
-  python play.py template [--output FILE]
-      Generate a blank answers file (default: my_answers.json).
-
-  python play.py submit <answers_file.json>
-      Read your answers file and score every submission.
 
 QUICK START
 -----------
   1.  pip install -e .
   2.  python play.py list
-    3.  python play.py show puzzle_03
-  4.  python play.py template          # creates my_answers.json
-  5.  # edit my_answers.json with your answers
-  6.  python play.py submit my_answers.json
+  3.  python play.py show puzzle_03
+  4.  # record your result on the course leaderboard
 
 INPUT FILE FORMAT
 -----------------
   See README.md → "Input File Format" section.
-
-  Short version:
-    my_answers.json can be a single JSON object OR a JSON array.
-
-  Single submission:
-    {
-        "puzzle_id": "puzzle_03",
-        "model":     "linear_regression",
-        "features":  ["square:x"]
-    }
-
-  Multiple submissions:
-    [
-        { "puzzle_id": "puzzle_01", "model": "linear_regression", "features": ["identity:x"] },
-        { "puzzle_id": "puzzle_03", "model": "linear_regression", "features": ["square:x"] }
-    ]
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import os
+import shutil
 import sys
 import textwrap
 from pathlib import Path
@@ -62,7 +38,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from blackbox_game import (
-    list_puzzles, get_puzzle, PlayerSession, POWER_MAP,
+    list_puzzles, get_puzzle, POWER_MAP,
 )
 
 
@@ -111,14 +87,12 @@ def cmd_list(args):
              else {1: "Beginner", 2: "Intermediate", 3: "Challenge"}.get(difficulty, ""))
     print(f"\n{_b('Blackbox ML Game')} — {_b(label)} puzzles  ({len(puzzles)} total)\n")
     print(SEP)
-    print(f"  {'ID':<22} {'Diff':<16} {'Category':<18} Title")
+    print(f"  {'ID':<22} Diff")
     print(SEP)
     for p in puzzles:
         print(
             f"  {_c(_puzzle_label(p['id'])):<31} "
-            f"{_diff_label(p['difficulty']):<25} "
-            f"{_d(p['category']):<18} "
-            f"{p['title']}"
+            f"{_diff_label(p['difficulty'])}"
         )
     print(SEP)
     print(_d("  Run: python play.py show <puzzle_id>"))
@@ -135,9 +109,9 @@ def cmd_show(args):
         print(_r(str(e)))
         sys.exit(1)
 
-    from blackbox_game import generate_dataset, list_binary_transforms, list_transforms
+    from blackbox_game import generate_dataset
 
-    dataset = generate_dataset(puzzle, n_samples=100, seed=42)
+    dataset = generate_dataset(puzzle, n_samples=20, seed=42)
     X = dataset["X"]
     y = dataset["y"]
     base_plot = None
@@ -165,33 +139,15 @@ def cmd_show(args):
     print()
 
     # Data preview
-    print(_b("  Sample data (first 12 rows of 100):"))
+    print(_b(f"  Sample data ({len(X)} rows):"))
     print()
     header = "  " + "  ".join(f"{col:<10}" for col in X.columns) + "  y"
     print(_d(header))
     print(_d("  " + "─" * (len(header) - 2)))
-    for i in range(min(12, len(X))):
+    for i in range(len(X)):
         row_vals = "  ".join(f"{X.iloc[i][col]:>10.4f}" for col in X.columns)
         print(f"  {row_vals}  {y[i]:>10.4f}")
-    if len(X) > 12:
-        print(_d(f"  ... ({len(X) - 12} more rows)"))
     print()
-
-    # Transforms
-    print(_b("  Available unary transforms:"))
-    all_tr = {t["key"]: t["description"] for t in list_transforms()}
-    for key in puzzle.allowed_transforms:
-        desc = all_tr.get(key, key)
-        power = f"  {_d('(power family)')}" if key in POWER_MAP else ""
-        print(f"    {_c(key):<18} {desc}{power}")
-    print()
-
-    if puzzle.allowed_binary_transforms:
-        all_bi = {t["key"]: t["description"] for t in list_binary_transforms()}
-        print(_b("  Available binary transforms:"))
-        for key in puzzle.allowed_binary_transforms:
-            print(f"    {_c(key):<18} {all_bi.get(key, key)}")
-        print()
 
     print(_b("  Models you can try:"))
     print(f"    linear_regression")
@@ -230,200 +186,6 @@ def cmd_transforms(args):
     print('    "identity:x"                          → x (unary)')
     print('    "square:x"                            → x²  (unary)')
     print('    {"binary": "multiply", "a": "x1", "b": "x2"}  → x1 × x2')
-    print()
-
-
-# ── Command: template ─────────────────────────────────────────────────────
-
-def cmd_template(args):
-    out_file = getattr(args, "output", None) or "my_answers.json"
-
-    puzzles  = list_puzzles()
-    template = []
-    for p in puzzles:
-        entry = {
-            "puzzle_id": _puzzle_label(p["id"]),
-            "model":     "linear_regression",
-            "features":  ["???"],
-            "_title":    p["title"],
-            "_difficulty": {1: "Beginner", 2: "Intermediate", 3: "Challenge"}.get(
-                p["difficulty"], str(p["difficulty"])
-            ),
-            "_input_features":     p["input_features"],
-            "_allowed_transforms": p["allowed_transforms"],
-        }
-        if p["allowed_binary_transforms"]:
-            entry["_allowed_binary_transforms"] = p["allowed_binary_transforms"]
-        template.append(entry)
-
-    with open(out_file, "w") as f:
-        json.dump(template, f, indent=2)
-
-    print(f"\n{_g('✓')} Template written to {_b(out_file)}")
-    print()
-    print("  Fill in the \"features\" and \"model\" fields for each puzzle.")
-    print("  Keys starting with _ are informational — you can delete them.")
-    print()
-    print("  Feature format examples:")
-    print('    ["identity:x"]                         ← raw x')
-    print('    ["square:x"]                           ← x²')
-    print('    ["sin:x", "identity:x"]                ← two features')
-    print('    [{"binary":"multiply","a":"x1","b":"x2"}]  ← x1 × x2')
-    print()
-    print(f"  Then run:  python play.py submit {out_file}")
-    print()
-
-
-# ── Command: submit ───────────────────────────────────────────────────────
-
-def cmd_submit(args):
-    path = args.answers_file
-    if not os.path.exists(path):
-        print(_r(f"File not found: {path}"))
-        sys.exit(1)
-
-    with open(path) as f:
-        try:
-            data = json.load(f)
-        except json.JSONDecodeError as e:
-            print(_r(f"Invalid JSON in {path}: {e}"))
-            sys.exit(1)
-
-    # Accept both single dict and list
-    if isinstance(data, dict):
-        submissions = [data]
-    elif isinstance(data, list):
-        submissions = data
-    else:
-        print(_r("JSON must be an object or array of objects."))
-        sys.exit(1)
-
-    # Strip template helper keys
-    def _clean(sub):
-        return {k: v for k, v in sub.items() if not k.startswith("_")}
-
-    submissions = [_clean(s) for s in submissions]
-
-    # Validate required fields
-    for i, sub in enumerate(submissions):
-        for field in ("puzzle_id", "model", "features"):
-            if field not in sub:
-                print(_r(f"Submission #{i+1} missing required field: '{field}'"))
-                sys.exit(1)
-        if sub["features"] == ["???"]:
-            print(_y(f"  [{sub['puzzle_id']}] skipped — features not filled in yet."))
-            submissions[i] = None
-
-    submissions = [s for s in submissions if s is not None]
-
-    if not submissions:
-        print(_y("No submissions to evaluate. Fill in the 'features' fields first."))
-        sys.exit(0)
-
-    from blackbox_game import evaluate_submission
-
-    # Evaluate
-    print(f"\n{SEP2}")
-    print(f"  {_b('Blackbox ML Game')} — Submission Results")
-    print(SEP2)
-    print()
-
-
-    total_score  = 0
-    correct_count = 0
-    fuzzy_count   = 0
-
-    for sub in submissions:
-        public_pid = sub["puzzle_id"]
-        pid      = _resolve_puzzle_id(public_pid)
-        model    = sub["model"]
-        features = sub["features"]
-
-        try:
-            puzzle = get_puzzle(pid)
-        except KeyError:
-            print(f"  {_r('✗')} {_r(public_pid)} — unknown puzzle ID, skipped.")
-            print()
-            continue
-
-        diff_label = {1: "Beginner", 2: "Intermediate", 3: "Challenge"}.get(
-            puzzle.difficulty, "?"
-        )
-
-        session = PlayerSession(puzzle_id=pid)
-        result  = evaluate_submission(
-            puzzle_id=pid,
-            model=model,
-            features=features,
-            session=session,
-        )
-
-        is_correct = result.get("is_correct", False)
-        is_fuzzy   = result.get("is_fuzzy", False)
-        score      = result.get("score_result", {}).get("total_score", 0)
-        r2         = result.get("r2", result.get("accuracy", None))
-        message    = result.get("message", "")
-        error      = result.get("error", None)
-
-        # Status icon
-        if error:
-            icon = _r("✗")
-        elif is_correct:
-            icon = _g("✓")
-            correct_count += 1
-        elif is_fuzzy:
-            icon = _y("≈")
-            fuzzy_count += 1
-        else:
-            icon = _r("✗")
-
-        total_score += score
-
-        # Puzzle line
-        print(f"  {icon}  {_b(puzzle.title):<40} {_d(f'[{diff_label}]')}")
-        print(f"     ID: {_c(_puzzle_label(pid)):<25} model: {model}")
-        print(f"     features: {json.dumps(features)}")
-
-        if error:
-            print(f"     {_r('Error:')} {error}")
-        else:
-            r2_str = f"{r2:.4f}" if r2 is not None else "N/A"
-            metric = "accuracy" if puzzle.function.type == "circle_classify" else "R²"
-            print(f"     {metric} = {_b(r2_str)}   score this attempt = {_b(str(score))}")
-            print(f"     {message}")
-
-        # Breakdown
-        sr = result.get("score_result", {})
-        if sr and not error:
-            mb = sr.get("model_bonus", 0)
-            fb = sr.get("feature_bonus", 0)
-            qb = sr.get("quality_bonus", 0)
-            pe = sr.get("penalty", 0)
-            parts = []
-            if mb: parts.append(f"+{mb} model")
-            if fb: parts.append(f"+{fb} feature")
-            if qb: parts.append(f"+{qb} quality")
-            if pe: parts.append(f"-{pe} penalty")
-            if parts:
-                print(f"     {_d('Breakdown: ' + '  '.join(parts))}")
-
-        if is_correct and "explanation" in result:
-            exp = result["explanation"]
-            print()
-            print(f"     {_b('Explanation:')}")
-            print(_wrap(exp["explanation"], width=68, indent=5))
-            print(_wrap(f"Real world: {exp['real_world_connection']}", width=68, indent=5))
-
-        print()
-
-    # Summary
-    print(SEP)
-    print(f"  {_b('Results:')}  "
-          f"{_g(str(correct_count))} correct  "
-          f"{_y(str(fuzzy_count))} fuzzy  "
-          f"{len(submissions) - correct_count - fuzzy_count} missed")
-    print(f"  {_b('Total score:')} {_b(str(total_score))}")
-    print(SEP)
     print()
 
 
@@ -513,6 +275,17 @@ def _plot_output(
 
     matplotlib_cache = Path.home() / ".cache" / "blackbox-ml-game" / "matplotlib"
     matplotlib_cache.mkdir(parents=True, exist_ok=True)
+
+    # Seed the persistent cache from the copy built at release time (see
+    # build-binaries.yml) so a player's very first --plot ever doesn't pay
+    # a full system font scan (several seconds to tens of seconds) — only
+    # the bundle's download does. Harmless no-op once a real cache exists.
+    if getattr(sys, "frozen", False) and not any(matplotlib_cache.glob("fontlist-*.json")):
+        bundled_cache = Path(sys.executable).parent / "_internal" / "mplcache"
+        if bundled_cache.is_dir():
+            for cached_file in bundled_cache.glob("fontlist-*.json"):
+                shutil.copy2(cached_file, matplotlib_cache / cached_file.name)
+
     # Must be a forced assignment, not setdefault(): PyInstaller's bundled
     # matplotlib runtime hook already sets MPLCONFIGDIR to a fresh
     # tempfile.mkdtemp() directory before this script runs, so setdefault()
@@ -629,15 +402,6 @@ def build_parser() -> argparse.ArgumentParser:
     # transforms
     sub.add_parser("transforms", help="List all available transforms")
 
-    # template
-    p_tmpl = sub.add_parser("template", help="Generate a blank answers template")
-    p_tmpl.add_argument("--output", default="my_answers.json",
-                        help="Output file path (default: my_answers.json)")
-
-    # submit
-    p_sub = sub.add_parser("submit", help="Submit and score your answers file")
-    p_sub.add_argument("answers_file", help="Path to your JSON answers file")
-
     # points and residuals
     for command, handler_help in (
         ("points", "Evaluate a puzzle at user-supplied input points"),
@@ -668,8 +432,6 @@ def main():
         "list":       cmd_list,
         "show":       cmd_show,
         "transforms": cmd_transforms,
-        "template":   cmd_template,
-        "submit":     cmd_submit,
         "points":     cmd_points,
         "residuals":  cmd_residuals,
     }
