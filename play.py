@@ -18,7 +18,7 @@ QUICK START
   1.  pip install -e .
   2.  python play.py list
   3.  python play.py show puzzle_03
-  4.  # record your result on the course leaderboard
+  4.  # record your result on the leaderboard
 
 INPUT FILE FORMAT
 -----------------
@@ -31,7 +31,6 @@ import argparse
 import os
 import shutil
 import sys
-import textwrap
 from pathlib import Path
 
 # ── Make the package importable even without `pip install -e .` ──────────
@@ -69,12 +68,6 @@ _PLOT_SEED = 42
 
 def _diff_label(d: int) -> str:
     return {1: _g("Beginner"), 2: _y("Intermediate"), 3: _r("Challenge")}.get(d, str(d))
-
-
-def _wrap(text: str, width: int = 60, indent: int = 2) -> str:
-    prefix = " " * indent
-    return textwrap.fill(text, width=width, initial_indent=prefix,
-                         subsequent_indent=prefix)
 
 
 # ── Command: list ─────────────────────────────────────────────────────────
@@ -128,12 +121,9 @@ def cmd_show(args):
     )
 
     print(f"\n{SEP2}")
-    print(f"  {_b(puzzle.title)}  [{_diff_label(puzzle.difficulty)} · {_d(puzzle.category)}]")
+    print(f"  {_b(puzzle.title)}  [{_diff_label(puzzle.difficulty)}]")
     print(f"  ID: {_c(_puzzle_label(puzzle_id))}")
     print(SEP2)
-    print()
-    print(_b("  Description"))
-    print(_wrap(puzzle.description, width=70))
     print()
     print(_b("  Input features: ") + _c(", ".join(puzzle.input_features)))
     print()
@@ -154,7 +144,7 @@ def cmd_show(args):
     print(f"    decision_tree")
     print()
     print(SEP)
-    print(_d("  Record your result on the course leaderboard."))
+    print(_d("  Record your result on the leaderboard."))
     if base_plot:
         print(f"  Base plot written: {_b(str(base_plot))}")
     print()
