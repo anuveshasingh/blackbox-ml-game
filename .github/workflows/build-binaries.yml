@@ -44,6 +44,24 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --clean --onedir \
             --name "${{ matrix.asset }}" play.py
+
+      - name: Prebuild matplotlib font cache
+        shell: bash
+        # Players still pay this scan once per machine (play.py seeds its
+        # persistent cache from this file on first run), but it moves the
+        # cost here instead of a random player's first --plot.
+        run: |
+          MPLCONFIGDIR="$(pwd)/dist/${{ matrix.asset }}/_internal/mplcache" python -c "
+          import os
+          os.makedirs(os.environ['MPLCONFIGDIR'], exist_ok=True)
+          import matplotlib
+          matplotlib.use('Agg')
+          import matplotlib.pyplot as plt
+          "
+
+      - name: Zip executable bundle
+        shell: bash
+        run: |
           ASSET_NAME="${{ matrix.asset }}" python - <<'PY'
           import os
           from pathlib import Path
