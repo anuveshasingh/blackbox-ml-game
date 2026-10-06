@@ -39,12 +39,6 @@ def _sample_x(rng, n, p):
     return {"x": rng.uniform(p["x_min"], p["x_max"], n)}
 
 
-def _sample_distractor(rng, n, p):
-    x1 = rng.uniform(p["x_min"], p["x_max"], n)
-    others = {f"x{i}": rng.uniform(-5.0, 5.0, n) for i in (2, 3, 4)}
-    return {"x1": x1, **others}
-
-
 def _sample_physics(rng, n, p):
     return {name: rng.uniform(lo, hi, n) for name, (lo, hi) in p["ranges"].items()}
 
@@ -54,7 +48,7 @@ _SAMPLERS = {
     "quadratic": _sample_x,
     "sqrt_fn": _sample_x,
     "log_fn": _sample_x,
-    "linear_distractor": _sample_distractor,
+    "linear_plus_sin": _sample_x,
     "physics": _sample_physics,
 }
 
@@ -72,8 +66,8 @@ def _hidden_function(fn_type: str, p: dict, c: dict) -> np.ndarray:
         y = p["a"] * np.sqrt(c["x"])
     elif fn_type == "log_fn":
         y = p["a"] * np.log(c["x"]) + p["b"]
-    elif fn_type == "linear_distractor":
-        y = p["slope"] * c["x1"] + p["intercept"]
+    elif fn_type == "linear_plus_sin":
+        y = p["slope"] * c["x"] + p["amplitude"] * np.sin(c["x"])
     elif fn_type == "physics":
         y = evaluate_formula(p["formula"], {**p.get("fixed", {}), **c})
     else:

@@ -1,6 +1,6 @@
 # Ground Truth and Design Decisions
 
-This file is the answer key and design record for the Blackbox ML Game. The code on the `preesha` branch is the ground truth; this file describes it. If they ever disagree, the code wins and this file should be updated.
+This file is the answer key and design record for the Blackbox ML Game. The code on the `code` branch is the ground truth; this file describes it. If they ever disagree, the code wins and this file should be updated.
 
 ## Catalogue at a glance
 
@@ -8,7 +8,7 @@ There are **17 puzzles**, numbered `puzzle_01` to `puzzle_17` with no gaps. Numb
 
 | Puzzles | Round | Kind |
 |---|---|---|
-| `puzzle_01` – `puzzle_06` | 1 — Beginner | Numerical, one obvious feature |
+| `puzzle_01` – `puzzle_06` | 1 — Beginner | Numerical, one input, one or two obvious features |
 | `puzzle_07` – `puzzle_10` | 2 — Physics | Numerical, two inputs, fixed constants |
 | `puzzle_11` – `puzzle_14` | 3 — Image, single transform | One transform, shown on one or two example pictures |
 | `puzzle_15` – `puzzle_17` | 3 — Image, combinations | One picture + several transforms |
@@ -110,7 +110,7 @@ outputs/
 | `puzzle_03` | $x \in [-5, 5]$ | $y = x^2$ | `square:x` |
 | `puzzle_04` | $x \in [0.5, 25]$ | $y = 2\sqrt{x}$ | `sqrt:x` |
 | `puzzle_05` | $x \in [1, 100]$ | $y = 3\ln(x) + 1$ | `log:x` |
-| `puzzle_06` | $x_1 \in [-5, 5]$; $x_2, x_3, x_4 \in [-5, 5]$ | $y = 3x_1$ | `identity:x1` ($x_2$–$x_4$ are distractors) |
+| `puzzle_06` | $x \in [-10, 10]$ | $y = x + 2\sin x$ | `identity:x`, `sin:x` (two features) |
 
 ## Round 2 — Physics (`puzzle_07` – `puzzle_10`)
 

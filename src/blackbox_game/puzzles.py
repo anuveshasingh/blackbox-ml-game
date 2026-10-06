@@ -37,9 +37,8 @@ _LINE_02 = _beginner("line_02", "linear", ["x"], slope=-2.0, intercept=20.0, x_m
 _SQUARE_01 = _beginner("square_01", "quadratic", ["x"], a=1.0, b=0.0, c=0.0, x_min=-5.0, x_max=5.0)
 _SQRT_01 = _beginner("sqrt_01", "sqrt_fn", ["x"], a=2.0, x_min=0.5, x_max=25.0)
 _LOG_01 = _beginner("log_01", "log_fn", ["x"], a=3.0, b=1.0, x_min=1.0, x_max=100.0)
-_DISTRACTOR_01 = _beginner(
-    "distractor_01", "linear_distractor", ["x1", "x2", "x3", "x4"],
-    slope=3.0, intercept=0.0, x_min=-5.0, x_max=5.0,
+_LINE_SIN_01 = _beginner(
+    "line_sin_01", "linear_plus_sin", ["x"], slope=1.0, amplitude=2.0, x_min=-10.0, x_max=10.0,
 )
 
 
@@ -141,7 +140,7 @@ _IMG_PIPELINES = [_image(name, [image], name) for name, (image, _) in PIPELINES.
 PUZZLE_REGISTRY: dict[str, Puzzle] = {
     p.id: p
     for p in [
-        _LINE_01, _LINE_02, _SQUARE_01, _SQRT_01, _LOG_01, _DISTRACTOR_01,
+        _LINE_01, _LINE_02, _SQUARE_01, _SQRT_01, _LOG_01, _LINE_SIN_01,
         _PHYS_PROJECTILE_Y, _PHYS_SHM_ENERGY, _PHYS_TRAVELLING_WAVE, _PHYS_COULOMB_2,
         _IMG_CHUNKS, _IMG_MIRROR, _IMG_SHIFT, _IMG_RBG,
         *_IMG_PIPELINES,
