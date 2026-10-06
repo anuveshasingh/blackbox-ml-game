@@ -35,7 +35,7 @@ The first run downloads the correct game executable for the computer and caches 
 |---|---|
 | `puzzle_01` to `puzzle_06` | Numerical (beginner) |
 | `puzzle_07` to `puzzle_10` | Numerical (physics) |
-| `puzzle_11` to `puzzle_21` | Image |
+| `puzzle_11` to `puzzle_20` | Image |
 
 ## Commands
 
@@ -54,8 +54,14 @@ uv run launch.py show puzzle_07 --plot
 For image puzzles, `show` writes `input.png` and `output.png`. Try your own transforms on the input picture; they are applied left to right:
 
 ```bash
-uv run launch.py show puzzle_17
-uv run launch.py apply puzzle_17 --apply invert rotate
+uv run launch.py show puzzle_18
+uv run launch.py apply puzzle_18 --apply invert rotate_chunks
+```
+
+Try transforms on any picture of your own (`.jpg`, `.jpeg` or `.png` only). It is cropped to a square and resized to 256×256 first, and results go to `outputs/custom/`:
+
+```bash
+uv run launch.py apply --image my_photo.jpg --apply invert vignette
 ```
 
 Everything is saved under:
