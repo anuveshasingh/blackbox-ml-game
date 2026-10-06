@@ -11,7 +11,8 @@ COMMANDS
       Show a puzzle's description and data. Image puzzles write input.png and output.png.
 
   python play.py apply <puzzle_id> --apply NAME [NAME ...]
-      Apply image transforms left to right to an image puzzle's input picture.
+  python play.py apply --image PATH --apply NAME [NAME ...]
+      Apply image transforms left to right to a puzzle's input or your own picture.
 
   python play.py transforms
       Print all available transformation keys.
@@ -181,18 +182,13 @@ def _show_image_puzzle(puzzle, puzzle_id: str) -> None:
 # ── Command: apply ────────────────────────────────────────────────────────
 
 def cmd_apply(args):
-    from PIL import Image
-    from blackbox_game.images import IMAGE_TRANSFORMS, apply_pipeline, puzzle_input_image
+    from blackbox_game.images import (
+        IMAGE_TRANSFORMS, apply_pipeline, load_user_image, puzzle_input_image, save_png,
+    )
     from blackbox_game.viewer import open_in_vscode
 
-    puzzle_id = _resolve_puzzle_id(args.puzzle_id)
-    try:
-        puzzle = get_puzzle(puzzle_id)
-    except KeyError as e:
-        print(_r(e.args[0]))
-        sys.exit(1)
-    if puzzle.function.type != "image":
-        print(_r("apply works on image puzzles only; this puzzle has numeric inputs."))
+    if (args.puzzle_id is None) == (args.image is None):
+        print(_r("Give either a puzzle ID or --image PATH (not both)."))
         sys.exit(1)
     unknown = [name for name in args.apply if name not in IMAGE_TRANSFORMS]
     if unknown:
@@ -200,11 +196,34 @@ def cmd_apply(args):
         print(_d(f"  Valid names: {', '.join(IMAGE_TRANSFORMS)}"))
         sys.exit(1)
 
-    result = apply_pipeline(puzzle_input_image(puzzle), args.apply)
-    output = _ensure_puzzle_dir(puzzle_id) / ("input_" + "_".join(args.apply) + ".png")
-    Image.fromarray(result).save(output)
+    steps_name = "_".join(args.apply)
+    if args.image is not None:
+        try:
+            source = load_user_image(args.image)
+        except (OSError, ValueError) as exc:
+            print(_r(f"Could not read the image {args.image}: {exc}"))
+            sys.exit(1)
+        stem = Path(args.image).name.split(".")[0] or "image"
+        out_dir = _output_root() / "custom"
+        save_png(source, out_dir / f"{stem}.png")
+        output = out_dir / f"{stem}_{steps_name}.png"
+    else:
+        puzzle_id = _resolve_puzzle_id(args.puzzle_id)
+        try:
+            puzzle = get_puzzle(puzzle_id)
+        except KeyError as e:
+            print(_r(e.args[0]))
+            sys.exit(1)
+        if puzzle.function.type != "image":
+            print(_r("apply works on image puzzles only; this puzzle has numeric inputs."))
+            sys.exit(1)
+        source = puzzle_input_image(puzzle)
+        output = _ensure_puzzle_dir(puzzle_id) / f"input_{steps_name}.png"
 
+    save_png(apply_pipeline(source, args.apply), output)
     print(f"\n{_g('✓')} Applied left to right: {_b(' → '.join(args.apply))}")
+    if args.image is not None:
+        print(f"  Input (256×256): {_b(str(output.parent / (stem + '.png')))}")
     print(f"  Written: {_b(str(output))}")
     if open_in_vscode([output]):
         print("  Opened in VS Code.")
@@ -530,8 +549,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("transforms", help="List all available transforms")
 
     # apply
-    p_apply = sub.add_parser("apply", help="Apply image transforms to an image puzzle's input")
-    p_apply.add_argument("puzzle_id", help="Image puzzle ID (e.g. puzzle_11)")
+    p_apply = sub.add_parser("apply", help="Apply image transforms to a puzzle's input or your own picture")
+    p_apply.add_argument("puzzle_id", nargs="?", help="Image puzzle ID (e.g. puzzle_11)")
+    p_apply.add_argument("--image", help="Your own picture instead of a puzzle (.jpg, .jpeg or .png)")
     p_apply.add_argument("--apply", nargs="+", required=True, metavar="TRANSFORM",
                          help="Transform names, applied left to right (see `transforms`)")
 

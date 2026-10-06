@@ -35,7 +35,7 @@ Puzzles are identified publicly by number so their names do not reveal the under
 |---|---|
 | `puzzle_01` to `puzzle_06` | Numerical (beginner) |
 | `puzzle_07` to `puzzle_10` | Numerical (physics) |
-| `puzzle_11` to `puzzle_21` | Image |
+| `puzzle_11` to `puzzle_20` | Image |
 
 List the catalogue at any time:
 
@@ -85,7 +85,13 @@ outputs/puzzle_11/output.png
 Work out what was done to `input.png` to make `output.png`. To test a guess, apply your own transforms to the input picture with `apply`. Give one or more transform names after `--apply`; they are applied left to right, and the result is saved as `input_<names>.png`:
 
 ```bash
-uv run python play.py apply puzzle_11 --apply invert rotate
+uv run python play.py apply puzzle_11 --apply invert rotate_chunks
+```
+
+You can also try transforms on any picture of your own (`.jpg`, `.jpeg` or `.png` only). It is cropped to a square and resized to 256×256 first, and the results go to `outputs/custom/`:
+
+```bash
+uv run python play.py apply --image my_photo.jpg --apply invert vignette
 ```
 
 Run `uv run python play.py transforms` to see every image transform name.
@@ -213,7 +219,8 @@ uv run python play.py list
 uv run python play.py show puzzle_07
 uv run python play.py show puzzle_07 --plot
 uv run python play.py show puzzle_11
-uv run python play.py apply puzzle_11 --apply invert rotate
+uv run python play.py apply puzzle_11 --apply invert rotate_chunks
+uv run python play.py apply --image my_photo.jpg --apply invert vignette
 uv run python play.py transforms
 uv run python play.py points puzzle_10 --input points.txt --plot
 uv run python play.py residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' --plot

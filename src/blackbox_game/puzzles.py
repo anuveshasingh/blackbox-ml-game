@@ -124,15 +124,16 @@ def _image(id: str, image: str, transform: str) -> Puzzle:
 
 
 # Single transforms
-_IMG_SOLARISE = _image("solarise", "doctor_strange", "solarise")
-_IMG_POSTERISE = _image("posterise", "istockphoto", "posterise")
-_IMG_OVERLAY = _image("overlay", "matrix", "repeated_overlay")
-_IMG_CHANNEL_SHUFFLE = _image("channel_shuffle", "pexels", "channel_shuffle")
-_IMG_FFT_ENCODE = _image("fft_encode", "chessboard", "fft_encode")
-_IMG_FFT_DECODE = _image("fft_decode", "istockphoto", "fft_decode")
+_IMG_CHUNKS_LSD = _image("chunks_lsd", "lsd", "rotate_chunks")
+_IMG_CHUNKS_CHESS = _image("chunks_checkmate", "checkmate", "rotate_chunks")
+_IMG_MIRROR_MOON = _image("mirror_moon", "moon", "mirror_sum")
+_IMG_MIRROR_MOLECULE = _image("mirror_molecule", "molecule", "mirror_sum")
+_IMG_SHIFT = _image("circular_shift", "matrix", "circular_shift")
+_IMG_RBG_MARBLES = _image("rbg_marbles", "marbles", "swap_rgb_rbg")
+_IMG_RBG_MONET = _image("rbg_monet", "monet", "swap_rgb_rbg")
 
-# Pipelines, in images.PIPELINES order. Four commute; the last does not.
-_IMG_PIPELINES = [_image(name, image, name) for name, (image, _, _) in PIPELINES.items()]
+# Pipelines, in images.PIPELINES order.
+_IMG_PIPELINES = [_image(name, image, name) for name, (image, _) in PIPELINES.items()]
 
 
 # ===========================================================================
@@ -144,8 +145,8 @@ PUZZLE_REGISTRY: dict[str, Puzzle] = {
     for p in [
         _LINE_01, _LINE_02, _SQUARE_01, _SQRT_01, _LOG_01, _DISTRACTOR_01,
         _PHYS_PROJECTILE_Y, _PHYS_SHM_ENERGY, _PHYS_TRAVELLING_WAVE, _PHYS_COULOMB_2,
-        _IMG_SOLARISE, _IMG_POSTERISE, _IMG_OVERLAY, _IMG_CHANNEL_SHUFFLE,
-        _IMG_FFT_ENCODE, _IMG_FFT_DECODE,
+        _IMG_CHUNKS_LSD, _IMG_CHUNKS_CHESS, _IMG_MIRROR_MOON, _IMG_MIRROR_MOLECULE,
+        _IMG_SHIFT, _IMG_RBG_MARBLES, _IMG_RBG_MONET,
         *_IMG_PIPELINES,
     ]
 }

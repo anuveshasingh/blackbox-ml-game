@@ -4,14 +4,14 @@ This file is the answer key and design record for the Blackbox ML Game. The code
 
 ## Catalogue at a glance
 
-There are **21 puzzles**, numbered `puzzle_01` to `puzzle_21` with no gaps. Numbers follow catalogue order. Public IDs never reveal the puzzle's name, title, function, or tier.
+There are **20 puzzles**, numbered `puzzle_01` to `puzzle_20` with no gaps. Numbers follow catalogue order. Public IDs never reveal the puzzle's name, title, function, or tier.
 
 | Puzzles | Round | Kind |
 |---|---|---|
 | `puzzle_01` – `puzzle_06` | 1 — Beginner | Numerical, one obvious feature |
 | `puzzle_07` – `puzzle_10` | 2 — Physics | Numerical, two inputs, fixed constants |
-| `puzzle_11` – `puzzle_16` | 3 — Image, single transform | Curated picture + one transform |
-| `puzzle_17` – `puzzle_21` | 3 — Image, combinations | Curated picture + several transforms |
+| `puzzle_11` – `puzzle_17` | 3 — Image, single transform | Curated picture + one transform |
+| `puzzle_18` – `puzzle_20` | 3 — Image, combinations | Curated picture + several transforms |
 
 ## Text shown to players
 
@@ -43,7 +43,8 @@ Then update this file to match.
 ```bash
 uv run python play.py list                          # IDs only, no titles or tiers
 uv run python play.py show puzzle_07 [--plot]       # description + data, or two pictures
-uv run python play.py apply puzzle_17 --apply invert rotate solarise
+uv run python play.py apply puzzle_18 --apply ghost_echo solarise   # on a puzzle's input.png
+uv run python play.py apply --image photo.jpg --apply invert vignette  # on your own picture
 uv run python play.py transforms                    # every feature and image transform name
 uv run python play.py points puzzle_07 --input points.txt [--plot]
 uv run python play.py residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' [--plot]
@@ -51,7 +52,7 @@ uv run python play.py residuals puzzle_07 --input points.txt --features square:t
 
 - `show` prints `ID: puzzle_NN`, the puzzle description (if any), the input columns and the sample rows. It does not print a title, a difficulty tier, or a list of models.
 - There is **no submission or scoring code**. Players record results on the separate leaderboard.
-- `apply` works on image puzzles only. `points` and `residuals` work on numerical puzzles only.
+- `apply` works on an image puzzle's input picture, or on any picture given with `--image` (`.jpg`, `.jpeg` or `.png` only; other formats are rejected). A player's picture is centre-cropped to a square and resized to 256×256 first, so it behaves exactly like a puzzle picture. `points` and `residuals` work on numerical puzzles only.
 
 ## Output folder
 
@@ -70,15 +71,18 @@ outputs/
 │   │       └── puzzle_07_y_vs_theta_t.ply
 │   ├── <input-name>_puzzle_07_output.csv          (from points)
 │   └── <input-name>_puzzle_07_residuals.csv       (from residuals)
-└── puzzle_17/
-    ├── input.png
-    ├── output.png
-    └── input_invert_rotate_solarise.png           (from apply)
+├── puzzle_18/
+│   ├── input.png
+│   ├── output.png
+│   └── input_ghost_echo_solarise.png             (from apply)
+└── custom/                                        (from apply --image)
+    ├── photo.png                                  (the 256×256 version of photo.jpg)
+    └── photo_invert_vignette.png
 ```
 
 - `show` does not write a CSV; the data is printed in the terminal. Plots are written only with `--plot`.
 - `points --plot` and `residuals --plot` write a PNG beside their CSV.
-- `apply` names its result `input_<transform names joined by _>.png`.
+- `apply` names its result `input_<transform names joined by _>.png`, or `<picture name>_<transform names>.png` under `custom/` for `--image`.
 
 ## Numerical data and plots
 
@@ -141,87 +145,93 @@ Binary transforms: `multiply`, `divide`, `add`, `subtract`, `distance`.
 
 `residuals` fits `linear_regression` (default) or a depth-4 `decision_tree` (`src/blackbox_game/fitting.py`). Linear regression scales each feature column before fitting; this does not change the fit, but stops a very large column from swamping the others.
 
-## Round 3 — Image Processing (`puzzle_11` – `puzzle_21`)
+## Round 3 — Image Processing (`puzzle_11` – `puzzle_20`)
 
 No data points or plots. `show` writes `input.png` and `output.png` (both 256×256 RGB) into the puzzle's folder and opens them in VS Code. Players work out what was done to the first picture to get the second, and can test guesses with `apply`.
 
 ### Curated images
 
-The source pictures were centre-cropped to a square and resized to 256×256 PNGs, stored in `src/blackbox_game/curated/`. The game reads only these PNGs.
+Each source picture is converted once to a 256×256 PNG in `src/blackbox_game/curated/`; the game reads only these PNGs. Most are centre-cropped to a square and resized. Two are placed so that `mirror_sum` lines up:
 
-| Name | Source file |
-|---|---|
-| `chessboard` | `black-white-checkered-chessboard-pattern-background_1017-60365.jpg.avif` |
-| `doctor_strange` | `doctor-strange91.jpg.webp` |
-| `istockphoto` | `istockphoto-1125768166-612x612.jpg` |
-| `matrix` | `matrix.avif` |
-| `pexels` | `pexels-photo-27966277.avif` |
+- `moon`: the moon's disc is centred in the square, so its flip lands on itself.
+- `molecule`: the drawing's own mirror line (found as the height where the drawing best matches its flip) is put exactly on the square's central horizontal line, so after the flip the ring and the OH groups coincide; only the parts that genuinely differ (Cl, H labels) double up. Transparency is flattened onto white.
+
+| Name | Source file | Used by |
+|---|---|---|
+| `lsd` | `lsd.jpg` | `puzzle_11` |
+| `checkmate` | `checkmate.jpeg` (chess endgame) | `puzzle_12` |
+| `moon` | `moon.jpg` | `puzzle_13` |
+| `molecule` | `smile.png` (achiral molecule) | `puzzle_14` |
+| `matrix` | `matrix.png` | `puzzle_15`, `puzzle_18` |
+| `marbles` | `marbles.png` (blue and green marbles) | `puzzle_16` |
+| `monet` | `monet.jpg` (blue Monet painting) | `puzzle_17` |
+| `doctor_strange` | `doctor_strange.png` | `puzzle_19` |
+| `pexels` | `pexels.png` | `puzzle_20` |
 
 ### All image transforms
 
-These 15 names are accepted by `apply`. Each takes and returns a 256×256 RGB image, so any sequence is valid. All work on a fixed canvas, pivot about the image centre, and are deterministic.
+These 12 names are accepted by `apply`. Each takes and returns a 256×256 RGB image, so any sequence is valid. All keep the canvas fixed and are deterministic.
 
 | Name | What it does | Parameters |
 |---|---|---|
+| `rotate_chunks` | Cuts the image into square tiles and rotates each tile 90° clockwise in place | 64 px tiles (4 × 4 grid) |
+| `mirror_sum` | Pixel-wise sum of the image and its flip about the central horizontal line, halved to stay in range | — |
+| `circular_shift` | Moves the image 32 px right; what leaves the right edge comes back on the left | (0, 32) |
+| `swap_rgb_rbg` | $(R, G, B) \to (R, B, G)$: green and blue exchange | — |
+| `swap_rgb_bgr` | $(R, G, B) \to (B, G, R)$: red and blue exchange | — |
+| `invert` | $255 - \text{value}$ on every channel | — |
 | `solarise` | Inverts every channel value at or above the threshold; darker values are unchanged | threshold 128 |
 | `posterise` | Reduces each channel to 4 levels: 0, 85, 170, 255 | step 64 |
-| `repeated_overlay` | Blends the image with copies of itself moved down and right by 4, 8 and 12 px, each step at 50% opacity. No wrap-around: where a copy does not reach, the image underneath stays | 3 overlays, 4 px offset, opacity 0.5 |
-| `channel_shuffle` | $(R, G, B) \to (B, R, G)$ | — |
-| `swap_rgb_bgr` | $(R, G, B) \to (B, G, R)$ | — |
-| `invert` | $255 - \text{value}$ on every channel | — |
-| `ghost_echo` | Blends the image with a copy moved 16 px right. No wrap-around: the leftmost 16 columns keep the original image | shift 16 px, weights 0.5137 image / 0.4863 echo |
-| `flip_horizontal` | Mirrors left–right | — |
-| `stretch_horizontal` | Horizontal magnification about the centre, nearest-neighbour (pixels sampled from outside the image would be black) | factor 1.6 |
-| `rotate` | Clockwise rotation about the centre, nearest-neighbour, corners filled black | 15° |
-| `gaussian_blur` | Separable 5-tap Gaussian, wrapping at the edges | σ = 1 |
-| `circular_shift` | Rolls the image 32 px right, wrapping around | (0, 32) |
+| `opacity` | Fades towards white: $0.6 \times \text{image} + 0.4 \times 255$ | 0.6 |
 | `vignette` | Darkens towards the corners: factor $1 - 0.6\,(r/\sqrt{2})^2$, $r$ = normalised distance from centre | strength 0.6 |
-| `fft_encode` | 2D Fourier transform of the grey image, zero frequency centred. Red = $\log(1 + \lvert F\rvert)$ scaled by 255/17; green = phase mapped from $[-\pi, \pi)$ to [0, 255]; blue = 0 | log cap 17 |
-| `fft_decode` | Inverse of `fft_encode`: rebuilds the grey image (as RGB) from an encoded spectrum | — |
+| `ghost_echo` | Blends the image with a copy moved 16 px right. No wrap-around: the leftmost 16 columns keep the original | shift 16 px, weights 0.5137 image / 0.4863 echo |
+| `stretch_horizontal` | Horizontal magnification about the centre, nearest-neighbour | factor 1.6 |
 
-`channel_shuffle` and `swap_rgb_bgr` are different swaps: the first rotates the channels, the second exchanges red and blue.
+`swap_rgb_rbg` and `swap_rgb_bgr` are different swaps: the first exchanges green and blue, the second red and blue.
 
 ### Single-transform puzzles
 
 | Puzzle | Image | Transform | Notes |
 |---|---|---|---|
-| `puzzle_11` | `doctor_strange` | `solarise` | |
-| `puzzle_12` | `istockphoto` | `posterise` | |
-| `puzzle_13` | `matrix` | `repeated_overlay` | |
-| `puzzle_14` | `pexels` | `channel_shuffle` | RGB → BRG |
-| `puzzle_15` | `chessboard` | `fft_encode` | |
-| `puzzle_16` | `istockphoto` | `fft_decode` | `input.png` is the encoded spectrum of the image; `output.png` is the decoded grey image. Round-trip PSNR ≈ 44 dB |
+| `puzzle_11` | `lsd` | `rotate_chunks` | Busy pattern: the tile seams give it away |
+| `puzzle_12` | `checkmate` | `rotate_chunks` | Chess endgame: rotated pieces and broken board pattern |
+| `puzzle_13` | `moon` | `mirror_sum` | |
+| `puzzle_14` | `molecule` | `mirror_sum` | Achiral molecule; the flipped copy coincides with the original |
+| `puzzle_15` | `matrix` | `circular_shift` | |
+| `puzzle_16` | `marbles` | `swap_rgb_rbg` | Hint image: blue and green marbles trade colours |
+| `puzzle_17` | `monet` | `swap_rgb_rbg` | Tough image: a mostly blue painting turns green |
 
 ### Combination puzzles
 
-Steps are applied left to right as listed. Four pipelines are **commutative**: every ordering of their steps gives a pixel-identical result. The last is **the trap**: order matters.
+Steps are applied left to right as listed. "Commutes" means every ordering of the steps gives a pixel-identical picture (`images.pipeline_commutes`).
 
-| Puzzle | Name | Image | Steps | Commutes? |
-|---|---|---|---|---|
-| `puzzle_17` | Psychedelic ghost | `doctor_strange` | `ghost_echo`, `swap_rgb_bgr`, `invert` | Yes |
-| `puzzle_18` | Funhouse pop-art | `doctor_strange` | `stretch_horizontal`, `flip_horizontal`, `posterise` | Yes |
-| `puzzle_19` | Tilted acid trip | `matrix` | `rotate`, `solarise`, `swap_rgb_bgr` | Yes |
-| `puzzle_20` | Dream negative | `istockphoto` | `gaussian_blur`, `invert`, `circular_shift` | Yes |
-| `puzzle_21` | The trap | `matrix` | `ghost_echo`, `vignette` | **No** |
+| Puzzle | Image | Steps | Commutes? |
+|---|---|---|---|
+| `puzzle_18` | `matrix` | `ghost_echo`, `solarise` | No |
+| `puzzle_19` | `doctor_strange` | `stretch_horizontal`, `posterise`, `swap_rgb_bgr` | Yes |
+| `puzzle_20` | `pexels` | `invert`, `circular_shift`, `rotate_chunks` | No |
 
-Why the trap does not commute: the vignette darkens towards the corners. Echo then vignette darkens the echo along with everything else. Vignette then echo copies an already-darkened edge 16 px into the picture, so the dark falloff is smeared sideways. The two orders are visibly different.
+Why they behave this way:
 
-### Rules that keep the commutative pipelines exact
+- **18:** solarise is not linear, so solarising then blending gives different values from blending then solarising.
+- **19:** the stretch only moves pixels, and posterise and the swap act on each pixel's own values, so the order never matters.
+- **20:** invert commutes with both, but the shift (32 px) is not a whole number of tiles (64 px), so shifting before or after rotating the tiles moves different pixels.
 
-- **Fixed canvas.** Every transform keeps the 256×256 size and pivots about the centre.
-- **Black fill only where it is safe.** `rotate` fills its corners black. Black stays black under `solarise` and under the channel swaps, so `puzzle_19` commutes. `invert` is never paired with `rotate`, because it would turn the black corners white in some orders.
-- **No wrap where the image should show through.** `ghost_echo` and `repeated_overlay` paste shifted copies without wrapping; the original image shows where a copy does not reach.
-- **Wrap where commuting needs it.** `gaussian_blur` wraps at the edges so it commutes exactly with `circular_shift` in `puzzle_20`.
-- **No rounding ties.** An exact 50/50 blend or a binomial blur kernel produces values ending in .5, which round differently depending on order. `ghost_echo` uses weight 0.5137 and `gaussian_blur` uses a σ = 1 Gaussian kernel to avoid this.
-- **Checked every time.** Whenever a commutative pipeline is rendered, the game computes every ordering of its steps and asserts the results are identical (`verify_pipeline`). If a new pipeline fails this, nudge a parameter (angle, scale, weight) to break the rounding tie.
+### Rules for image transforms
+
+- **Fixed canvas.** Every transform keeps the 256×256 size.
+- **No rounding ties in blends.** An exact 50/50 blend gives values ending in .5 that round differently in different orders; `ghost_echo` uses 0.5137 to avoid this.
+- **Edges.** `circular_shift` wraps around. `ghost_echo` does not: the original shows where the echo does not reach. `stretch_horizontal` only magnifies, so it never samples outside the image.
 
 ## Reproducibility
 
 - **Numerical puzzles:** exact function values, NumPy seed `42`. Every run prints identical data and draws identical plots.
 - **Image puzzles:** the curated PNGs and every transform parameter are fixed in code, so `input.png` and `output.png` are byte-identical on every run.
+- **Fourier puzzles were removed.** There are no Fourier-transform puzzles or transforms.
 
 ## Packaging
 
 - Runtime dependencies: `numpy`, `pandas`, `scikit-learn`, `matplotlib`, `Pillow`. The curated PNGs are declared as package data.
 - The player binaries are built from the tip of `preesha` by the workflow on `preesha-binaries`. Its PyInstaller step uses `--collect-data blackbox_game`, which bundles `curated/`. Any new file the game reads at runtime must live inside the `blackbox_game` package and match `package-data`, or the binaries will not include it.
+- Player pictures for `apply --image` must be `.jpg`, `.jpeg` or `.png` (checked by extension and by the file's real format). All source pictures are kept as JPEG or PNG.
 - There is no test suite. Check changes by running `show`, `apply`, `points` and `residuals` on the affected puzzles.
