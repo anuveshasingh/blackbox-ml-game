@@ -4,11 +4,11 @@ play.py — Blackbox ML Game  (run from the repo root)
 
 COMMANDS
 --------
-  python play.py list [--difficulty 1|2|3]
-      List all puzzle IDs (optionally filter by difficulty).
+  python play.py list
+      List all puzzle IDs.
 
   python play.py show <puzzle_id>
-      Show a puzzle's description and input data.
+      Show a puzzle's description and input data. Image puzzles write two pictures.
 
   python play.py transforms
       Print all available transformation keys.
@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 from blackbox_game import (
     list_puzzles, get_puzzle, POWER_MAP,
 )
+from blackbox_game.puzzles import puzzle_number, puzzle_id_from_number
 
 
 # ── ANSI colours (VS Code terminal supports these) ────────────────────────
@@ -66,33 +67,33 @@ _PLOT_SEED = 42
 
 # ── Helpers ───────────────────────────────────────────────────────────────
 
-def _diff_label(d: int) -> str:
-    return {1: _g("Beginner"), 2: _y("Intermediate"), 3: _r("Challenge")}.get(d, str(d))
-
-
 # ── Command: list ─────────────────────────────────────────────────────────
 
 def cmd_list(args):
-    difficulty = args.difficulty
-    puzzles    = list_puzzles(difficulty=difficulty)
-
-    label = ("All" if difficulty is None
-             else {1: "Beginner", 2: "Intermediate", 3: "Challenge"}.get(difficulty, ""))
-    print(f"\n{_b('Blackbox ML Game')} — {_b(label)} puzzles  ({len(puzzles)} total)\n")
-    print(SEP)
-    print(f"  {'ID':<22} Diff")
+    puzzles = list_puzzles()
+    print(f"\n{_b('Blackbox ML Game')} — {len(puzzles)} puzzles\n")
     print(SEP)
     for p in puzzles:
-        print(
-            f"  {_c(_puzzle_label(p['id'])):<31} "
-            f"{_diff_label(p['difficulty'])}"
-        )
+        print(f"  {_c(_puzzle_label(p['id']))}")
     print(SEP)
     print(_d("  Run: python play.py show <puzzle_id>"))
     print()
 
 
 # ── Command: show ─────────────────────────────────────────────────────────
+
+def _wrap(text: str, width: int = 62) -> list[str]:
+    words, lines, line = text.split(), [], ""
+    for word in words:
+        if line and len(line) + 1 + len(word) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    if line:
+        lines.append(line)
+    return lines
+
 
 def cmd_show(args):
     puzzle_id = _resolve_puzzle_id(args.puzzle_id)
@@ -102,28 +103,25 @@ def cmd_show(args):
         print(_r(str(e)))
         sys.exit(1)
 
+    if puzzle.function.type == "image":
+        _show_image_puzzle(puzzle, puzzle_id)
+        return
+
     from blackbox_game import generate_dataset
 
-    dataset = generate_dataset(puzzle, n_samples=20, seed=42)
+    dataset = generate_dataset(puzzle, n_samples=100, seed=42)
     X = dataset["X"]
     y = dataset["y"]
-    base_plot = None
+    plot_files, plot_note = [], None
     if args.plot:
-        _ensure_output_dirs()
-        base_plot = _plot_output(
-            X.assign(y=y),
-            _puzzle_output_dir(puzzle_id) / f"{_puzzle_label(puzzle_id)}_base.csv",
-            "points",
-        )
-
-    diff_label = {1: "Beginner", 2: "Intermediate", 3: "Challenge"}.get(
-        puzzle.difficulty, str(puzzle.difficulty)
-    )
+        plot_files, plot_note = _write_show_plots(puzzle, puzzle_id, X, y)
 
     print(f"\n{SEP2}")
-    print(f"  {_b(puzzle.title)}  [{_diff_label(puzzle.difficulty)}]")
     print(f"  ID: {_c(_puzzle_label(puzzle_id))}")
     print(SEP2)
+    print()
+    for line in _wrap(puzzle.description):
+        print(f"  {line}")
     print()
     print(_b("  Input features: ") + _c(", ".join(puzzle.input_features)))
     print()
@@ -131,22 +129,49 @@ def cmd_show(args):
     # Data preview
     print(_b(f"  Sample data ({len(X)} rows):"))
     print()
-    header = "  " + "  ".join(f"{col:<10}" for col in X.columns) + "  y"
+    header = "  " + "  ".join(f"{col:<12}" for col in X.columns) + "  y"
     print(_d(header))
     print(_d("  " + "─" * (len(header) - 2)))
     for i in range(len(X)):
-        row_vals = "  ".join(f"{X.iloc[i][col]:>10.4f}" for col in X.columns)
-        print(f"  {row_vals}  {y[i]:>10.4f}")
-    print()
-
-    print(_b("  Models you can try:"))
-    print(f"    linear_regression")
-    print(f"    decision_tree")
+        row_vals = "  ".join(f"{X.iloc[i][col]:>12.5g}" for col in X.columns)
+        print(f"  {row_vals}  {y[i]:>12.5g}")
     print()
     print(SEP)
     print(_d("  Record your result on the leaderboard."))
-    if base_plot:
-        print(f"  Base plot written: {_b(str(base_plot))}")
+    if plot_files:
+        print(f"  Plots written to {_b(str(plot_files[0].parent))}:")
+        for path in plot_files:
+            print(f"    {path.name}")
+    if plot_note:
+        print(f"  {plot_note}")
+    print()
+
+
+def _show_image_puzzle(puzzle, puzzle_id: str) -> None:
+    """Write the two pictures for an image puzzle and show where they are."""
+    from blackbox_game.images import render_image_puzzle
+    from blackbox_game.viewer import open_in_vscode
+
+    _ensure_output_dirs()
+    params = puzzle.function.parameters
+    input_png, output_png = render_image_puzzle(
+        params["image"], params["transform"], _puzzle_output_dir(puzzle_id),
+    )
+
+    print(f"\n{SEP2}")
+    print(f"  ID: {_c(_puzzle_label(puzzle_id))}")
+    print(SEP2)
+    print()
+    for line in _wrap(puzzle.description):
+        print(f"  {line}")
+    print()
+    print(f"  {_b('Input:')}  {input_png}")
+    print(f"  {_b('Output:')} {output_png}")
+    print()
+    if open_in_vscode([input_png, output_png]):
+        print("  Opened both pictures in VS Code.")
+    print(SEP)
+    print(_d("  Record your result on the leaderboard."))
     print()
 
 
@@ -215,10 +240,7 @@ def _output_root() -> Path:
 
 
 def _puzzle_number(puzzle_id: str) -> int:
-    for number, puzzle in enumerate(list_puzzles(), 1):
-        if puzzle["id"] == puzzle_id:
-            return number
-    raise KeyError(f"Unknown puzzle ID: {puzzle_id}")
+    return puzzle_number(puzzle_id)
 
 
 def _puzzle_label(puzzle_id: str) -> str:
@@ -231,9 +253,7 @@ def _resolve_puzzle_id(identifier: str) -> str:
             number = int(identifier.removeprefix("puzzle_"))
         except ValueError:
             return identifier
-        puzzles = list_puzzles()
-        if 1 <= number <= len(puzzles):
-            return puzzles[number - 1]["id"]
+        return puzzle_id_from_number(number) or identifier
     return identifier
 
 
@@ -255,14 +275,8 @@ def _points_output_path(input_path: str, puzzle_id: str, suffix: str) -> Path:
     return _ensure_output_dirs() / label / f"{source.stem}_{label}_{suffix}.csv"
 
 
-def _plot_output(
-    data,
-    csv_path: Path,
-    kind: str,
-) -> Path:
-    """Save a non-interactive plot beside a generated CSV."""
-    import numpy as np
-
+def _matplotlib_pyplot():
+    """Return pyplot set to a non-interactive backend with a persistent font cache."""
     matplotlib_cache = Path.home() / ".cache" / "blackbox-ml-game" / "matplotlib"
     matplotlib_cache.mkdir(parents=True, exist_ok=True)
 
@@ -285,6 +299,77 @@ def _plot_output(
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    return plt
+
+
+def _save_univariate_plots(X, y, plots_dir: Path) -> list[Path]:
+    """One scatter per input, y against that input. No jitter: values are exact."""
+    from blackbox_game.plots import safe_name
+
+    plt = _matplotlib_pyplot()
+    paths = []
+    for column in X.columns:
+        figure, axis = plt.subplots(figsize=(7, 4))
+        axis.scatter(X[column], y, alpha=0.7, s=24)
+        axis.set_xlabel(column)
+        axis.set_ylabel("y")
+        axis.set_title(f"{column} vs y")
+        axis.grid(True, alpha=0.3)
+        figure.tight_layout()
+        path = plots_dir / f"y_vs_{safe_name(column)}.png"
+        figure.savefig(path, dpi=150)
+        plt.close(figure)
+        paths.append(path)
+    return paths
+
+
+def _write_show_plots(puzzle, puzzle_id: str, X, y):
+    """
+    Write the plots for ``show --plot``.
+
+    Every puzzle gets univariate PNGs. Intermediate and challenge puzzles with
+    two or more inputs also get 3D PLY files, which are opened in VS Code.
+    Returns (files written, a note for the player or None).
+    """
+    from blackbox_game.plots import save_3d_plots
+    from blackbox_game.viewer import ensure_viewer_extension, open_in_vscode
+
+    _ensure_output_dirs()
+    plots_dir = _puzzle_output_dir(puzzle_id) / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    files = _save_univariate_plots(X, y, plots_dir)
+
+    three_d = []
+    if puzzle.difficulty >= 2 and len(X.columns) >= 2:
+        three_d = save_3d_plots(X, y, plots_dir / "3d", _puzzle_label(puzzle_id))
+        files += three_d
+
+    note = None
+    if three_d:
+        status = ensure_viewer_extension()
+        if status in ("ready", "installed"):
+            if open_in_vscode(three_d):
+                note = "Opened the 3D plots in VS Code. Drag with the mouse to rotate."
+            else:
+                note = "Could not open VS Code. Open the .ply files above by hand."
+        elif status == "no-vscode":
+            note = ("VS Code's `code` command is not on PATH, so the 3D plots were not opened. "
+                    "In VS Code run 'Shell Command: Install code command in PATH', then run this again.")
+        else:
+            note = (f"Could not install the PLY viewer automatically. "
+                    f"In VS Code, install 'kleinicke.ply-visualizer', then run this again.")
+    return files, note
+
+
+def _plot_output(
+    data,
+    csv_path: Path,
+    kind: str,
+) -> Path:
+    """Save a non-interactive plot beside a generated CSV."""
+    import numpy as np
+
+    plt = _matplotlib_pyplot()
 
     plot_path = csv_path.with_suffix(".png")
     rng = np.random.default_rng(_PLOT_SEED)
@@ -327,8 +412,10 @@ def cmd_points(args):
         from blackbox_game import evaluate_points
 
         puzzle = get_puzzle(_resolve_puzzle_id(args.puzzle_id))
+        if puzzle.function.type == "image":
+            raise ValueError("image puzzles have no numeric inputs; use show instead")
         points = _read_points(args.input, puzzle)
-        result = evaluate_points(puzzle, points, include_noise=not args.no_noise)
+        result = evaluate_points(puzzle, points)
         output = Path(args.output) if args.output else _points_output_path(args.input, puzzle.id, "output")
         values = result["X"].assign(y=result["y"])
         values.to_csv(output, index=False)
@@ -348,8 +435,10 @@ def cmd_residuals(args):
         from blackbox_game.evaluator import build_feature_matrix, predict_model
 
         puzzle = get_puzzle(_resolve_puzzle_id(args.puzzle_id))
+        if puzzle.function.type == "image":
+            raise ValueError("image puzzles have no numeric inputs; use show instead")
         points = _read_points(args.input, puzzle)
-        result = evaluate_points(puzzle, points, include_noise=not args.no_noise)
+        result = evaluate_points(puzzle, points)
         X_feat = build_feature_matrix(result["X"], args.features)
         task = "classification" if puzzle.function.type == "circle_classify" else "regression"
         predictions = predict_model(X_feat, result["y"], args.model, task=task)
@@ -379,15 +468,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     # list
-    p_list = sub.add_parser("list", help="List all puzzles")
-    p_list.add_argument("--difficulty", type=int, choices=[1, 2, 3], default=None,
-                        help="Filter: 1=Beginner, 2=Intermediate, 3=Challenge")
+    sub.add_parser("list", help="List all puzzles")
 
     # show
     p_show = sub.add_parser("show", help="Show a puzzle and its data")
     p_show.add_argument("puzzle_id", help="Puzzle ID (e.g. puzzle_03)")
     p_show.add_argument("--plot", action="store_true",
-                        help="Also save the generated points as <puzzle_id>_base.png")
+                        help="Save plots under outputs/; 3D plots open in VS Code")
 
     # transforms
     sub.add_parser("transforms", help="List all available transforms")
@@ -401,8 +488,6 @@ def build_parser() -> argparse.ArgumentParser:
         point_parser.add_argument("puzzle_id", help="Puzzle ID (e.g. puzzle_03)")
         point_parser.add_argument("--input", required=True, help="Text file with one input point per line")
         point_parser.add_argument("--output", help="CSV path (default: input stem plus puzzle ID and command)")
-        point_parser.add_argument("--no-noise", action="store_true",
-                                  help="Do not add the puzzle's configured output noise")
         point_parser.add_argument("--plot", action="store_true",
                       help="Also save a PNG plot beside the CSV")
         if command == "residuals":

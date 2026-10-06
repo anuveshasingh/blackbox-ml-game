@@ -13,8 +13,8 @@ from blackbox_game.models import Puzzle
 class TestPuzzleRegistry:
 
     def test_total_puzzle_count(self):
-        assert len(PUZZLE_REGISTRY) == 25, (
-            f"Expected 25 puzzles, found {len(PUZZLE_REGISTRY)}"
+        assert len(PUZZLE_REGISTRY) == 16, (
+            f"Expected 16 puzzles, found {len(PUZZLE_REGISTRY)}"
         )
 
     def test_get_puzzle_returns_puzzle(self):
@@ -30,39 +30,35 @@ class TestPuzzleRegistry:
         assert len(ids) == len(set(ids))
 
     def test_list_puzzles_returns_all(self):
-        assert len(list_puzzles()) == 25
+        assert len(list_puzzles()) == 16
 
     def test_list_puzzles_filter_beginner(self):
         beginner = list_puzzles(difficulty=1)
         assert len(beginner) == 6
         assert all(p["difficulty"] == 1 for p in beginner)
 
-    def test_list_puzzles_filter_intermediate(self):
-        intermediate = list_puzzles(difficulty=2)
-        assert len(intermediate) == 9
-        assert all(p["difficulty"] == 2 for p in intermediate)
+    def test_list_puzzles_filter_physics(self):
+        physics = list_puzzles(difficulty=2)
+        assert len(physics) == 4
+        assert all(p["difficulty"] == 2 for p in physics)
 
-    def test_list_puzzles_filter_challenge(self):
-        challenge = list_puzzles(difficulty=3)
-        assert len(challenge) == 10
-        assert all(p["difficulty"] == 3 for p in challenge)
+    def test_image_tier_has_six_puzzles(self):
+        images = list_puzzles(difficulty=3)
+        assert [p["id"] for p in images] == [
+            "solarise", "posterise", "overlay", "channel_shuffle", "fft_encode", "fft_decode",
+        ]
 
-    def test_only_two_decision_tree_puzzles(self):
-        """Reduced from 6 DT puzzles to 2."""
+    def test_no_decision_tree_puzzles(self):
         dt_puzzles = [
             p for p in PUZZLE_REGISTRY.values()
             if p.intended_model == "decision_tree"
         ]
-        assert len(dt_puzzles) == 2, (
-            f"Expected 2 DT puzzles, found {len(dt_puzzles)}: "
-            f"{[p.id for p in dt_puzzles]}"
-        )
+        assert dt_puzzles == []
 
-    def test_new_lr_puzzles_present(self):
-        """New LR puzzles added in v2."""
-        for pid in ("abs_01", "cos_01", "polynomial_01", "phase_01"):
-            p = get_puzzle(pid)
-            assert p.intended_model == "linear_regression"
+    def test_physics_puzzles_are_linear_regression(self):
+        for p in PUZZLE_REGISTRY.values():
+            if p.function.type == "physics":
+                assert p.intended_model == "linear_regression", p.id
 
     def test_all_puzzles_have_required_fields(self):
         required = [
@@ -96,7 +92,7 @@ class TestPuzzleRegistry:
             )
 
     def test_intended_model_is_valid(self):
-        valid = {"linear_regression", "decision_tree"}
+        valid = {"linear_regression", "decision_tree", "none"}
         for pid, puzzle in PUZZLE_REGISTRY.items():
             assert puzzle.intended_model in valid, (
                 f"Puzzle '{pid}' has invalid intended_model '{puzzle.intended_model}'."
@@ -120,7 +116,7 @@ class TestPuzzleSerialization:
         assert parsed["id"] == "square_01"
 
     def test_round_trip_serialization(self):
-        puzzle  = get_puzzle("product_01")
+        puzzle  = get_puzzle("projectile_y")
         puzzle2 = Puzzle.from_json(puzzle.to_json())
         assert puzzle2.id == puzzle.id
         assert puzzle2.function.type == puzzle.function.type

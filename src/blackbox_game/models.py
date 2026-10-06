@@ -36,7 +36,7 @@ class Puzzle:
     description : player-facing scenario description
     input_features : names of raw input columns
     function : serialisable hidden function specification
-    noise_std : Gaussian noise added during generation (0 for beginner)
+    noise_std : Gaussian noise added during generation (0 for every current puzzle)
     allowed_transforms : unary transform keys the player may use
     allowed_binary_transforms : binary transform keys the player may use
     intended_model : "linear_regression" or "decision_tree"

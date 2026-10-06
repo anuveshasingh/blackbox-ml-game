@@ -31,42 +31,43 @@ No virtual-environment activation is needed. Later commands use the same `uv run
 
 Puzzles are identified publicly by number so their names do not reveal the underlying function.
 
-| Difficulty | Puzzles |
+| Puzzles | Kind |
 |---|---|
-| Beginner | `puzzle_01` through `puzzle_06` |
-| Intermediate | `puzzle_07` through `puzzle_15` |
-| Challenge | `puzzle_16` through `puzzle_25` |
+| `puzzle_01` to `puzzle_06` | Numerical (beginner) |
+| `puzzle_07` to `puzzle_10` | Numerical (physics) |
+| `puzzle_11` to `puzzle_16` | Image |
 
 List the catalogue at any time:
 
 ```bash
 uv run python play.py list
-uv run python play.py list --difficulty 1
-uv run python play.py list --difficulty 2
-uv run python play.py list --difficulty 3
 ```
 
 ## Playing A Puzzle
 
-Start with a puzzle description and a 100-row sample:
+Start with a puzzle description and a 100-row sample. For numerical puzzles:
 
 ```bash
-uv run python play.py show puzzle_08
+uv run python play.py show puzzle_07
 ```
 
 This prints the puzzle description, input columns, sample rows, and the transformations available for that puzzle.
 
-Create the base plot for the generated sample:
+Create the plots for the generated sample:
 
 ```bash
-uv run python play.py show puzzle_08 --plot
+uv run python play.py show puzzle_07 --plot
 ```
 
-The PNG is written to:
+This writes one PNG per input (`y` against that input) and, for physics puzzles with two or more inputs, one 3D PLY file per pair of inputs:
 
 ```text
-outputs/puzzle_08/puzzle_08_base.png
+outputs/puzzle_07/plots/y_vs_theta.png
+outputs/puzzle_07/plots/y_vs_t.png
+outputs/puzzle_07/plots/3d/puzzle_07_y_vs_theta_t.ply
 ```
+
+The 3D files open in VS Code. The first time you run this, the game installs the PLY viewer extension (`kleinicke.ply-visualizer`) for you. Drag with the mouse to rotate. If the `code` command is not on your PATH, the game tells you how to fix that.
 
 List all transformation names and binary operations:
 
@@ -81,19 +82,19 @@ A feature such as `square:x1` means that the model receives $x1^2$ rather than t
 Use `points` when you want to evaluate the hidden function at your own input rows:
 
 ```bash
-uv run python play.py points puzzle_17 --input points.txt
+uv run python play.py points puzzle_10 --input points.txt
 ```
 
 The CSV is written under:
 
 ```text
-outputs/puzzle_17/<input-name>_puzzle_17_output.csv
+outputs/puzzle_10/<input-name>_puzzle_10_output.csv
 ```
 
 Add `--plot` to create a PNG beside the CSV:
 
 ```bash
-uv run python play.py points puzzle_17 --input points.txt --plot
+uv run python play.py points puzzle_10 --input points.txt --plot
 ```
 
 ### Input File Format
@@ -134,16 +135,16 @@ Do not add a `y` column. The program calculates `y`. Do not add transformed colu
 Use `residuals` to fit a model to your supplied points and export the observed output, model prediction, and residual:
 
 ```bash
-uv run python play.py residuals puzzle_08 \
+uv run python play.py residuals puzzle_07 \
   --input points.txt \
-  --features identity:x sin:x \
+  --features identity:t sin:theta \
   --model linear_regression
 ```
 
 The residual CSV is written to:
 
 ```text
-outputs/puzzle_08/<input-name>_puzzle_08_residuals.csv
+outputs/puzzle_07/<input-name>_puzzle_07_residuals.csv
 ```
 
 The residual is:
@@ -155,28 +156,16 @@ residual = y - prediction
 Add `--plot` to create `..._residuals.png` beside the CSV:
 
 ```bash
-uv run python play.py residuals puzzle_08 \
+uv run python play.py residuals puzzle_07 \
   --input points.txt \
-  --features identity:x sin:x \
+  --features identity:t sin:theta \
   --model linear_regression \
   --plot
 ```
 
-Use `--no-noise` with `points` or `residuals` when you need the deterministic function rather than the generated noisy output:
-
-```bash
-uv run python play.py points puzzle_08 --input points.txt --no-noise
-```
-
 ## Noise
 
-Generated outputs include reproducible NumPy noise with seed `42`. Every puzzle receives uniform formula noise bounded by:
-
-```text
-Uniform(-1.0, +1.0)
-```
-
-Some puzzles also have their own configured Gaussian noise. Plot files add visual jitter bounded by `1.0` on top of the generated values. Random noise is not a meaningful feature: do not try to create a feature for it or treat it as part of the hidden equation.
+Numerical puzzles are exact: their outputs are the true function values, with no formula noise. A puzzle can declare its own Gaussian noise, but no current puzzle does. The `points` and `residuals` plots add visual jitter bounded by `1.0` so overlapping points stay visible. The jitter is not in the CSV files. Random jitter is not a meaningful feature: do not try to create a feature for it.
 
 ## Leaderboard
 
@@ -186,9 +175,9 @@ This repository is the game engine and exploration tool. Do not create or send a
 
 ```bash
 uv run python play.py list
-uv run python play.py show puzzle_08
-uv run python play.py show puzzle_08 --plot
+uv run python play.py show puzzle_07
+uv run python play.py show puzzle_07 --plot
 uv run python play.py transforms
-uv run python play.py points puzzle_17 --input points.txt --plot
-uv run python play.py residuals puzzle_08 --input points.txt --features identity:x sin:x --plot
+uv run python play.py points puzzle_10 --input points.txt --plot
+uv run python play.py residuals puzzle_07 --input points.txt --features identity:t sin:theta --plot
 ```

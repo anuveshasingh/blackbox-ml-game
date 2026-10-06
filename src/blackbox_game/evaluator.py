@@ -69,6 +69,13 @@ def build_feature_matrix(
       (e.g. ``"square:x"``)
     * a dict ``{"binary": "multiply", "a": "x1", "b": "x2"}``
       → applies a binary transform to two columns
+    * a dict ``{"product": [spec, ...]}``
+      → multiplies the element-wise values of nested specs
+    * a dict ``{"sum": [spec, {"term": spec, "sign": -1}, ...]}``
+      → adds (or subtracts, with ``sign: -1``) nested specs
+
+    Any ``product`` or ``sum`` dict may also carry ``"transform": key`` to
+    apply a unary transform to its result (e.g. ``exp_neg`` or ``sin``).
 
     Parameters
     ----------
@@ -87,33 +94,50 @@ def build_feature_matrix(
     ValueError
         If a specified column or transform is not found.
     """
-    cols = []
-    for spec in features:
-        if isinstance(spec, dict):
-            # Binary transform
-            binary_key = spec["binary"]
-            a = X[spec["a"]].values
-            b = X[spec["b"]].values
-            cols.append(apply_binary_transform(binary_key, a, b))
-        elif ":" in spec:
-            # "transform:column" shorthand
-            transform_key, col_name = spec.split(":", 1)
-            col_name = col_name.strip()
-            transform_key = transform_key.strip()
-            if col_name not in X.columns:
-                raise ValueError(f"Column '{col_name}' not in dataset.")
-            cols.append(apply_transform(transform_key, X[col_name].values))
-        else:
-            # Plain column reference
-            if spec not in X.columns:
-                raise ValueError(f"Column '{spec}' not in dataset.")
-            cols.append(X[spec].values.astype(float))
+    cols = [_eval_spec(X, spec) for spec in features]
 
     if not cols:
         raise ValueError("features list must not be empty.")
 
     matrix = np.column_stack(cols)
     return matrix
+
+
+def _eval_spec(X: pd.DataFrame, spec: Union[str, dict]) -> np.ndarray:
+    """Evaluate one feature specification to a 1-D array (see build_feature_matrix)."""
+    if isinstance(spec, dict) and "product" in spec:
+        result = np.prod([_eval_spec(X, s) for s in spec["product"]], axis=0)
+    elif isinstance(spec, dict) and "sum" in spec:
+        terms = []
+        for item in spec["sum"]:
+            sign = 1.0
+            if isinstance(item, dict) and "term" in item:
+                sign = float(item.get("sign", 1))
+                item = item["term"]
+            terms.append(sign * _eval_spec(X, item))
+        result = np.sum(terms, axis=0)
+    elif isinstance(spec, dict):
+        # Binary transform
+        a = X[spec["a"]].values
+        b = X[spec["b"]].values
+        return apply_binary_transform(spec["binary"], a, b)
+    elif ":" in spec:
+        # "transform:column" shorthand
+        transform_key, col_name = spec.split(":", 1)
+        col_name = col_name.strip()
+        transform_key = transform_key.strip()
+        if col_name not in X.columns:
+            raise ValueError(f"Column '{col_name}' not in dataset.")
+        return apply_transform(transform_key, X[col_name].values)
+    else:
+        # Plain column reference
+        if spec not in X.columns:
+            raise ValueError(f"Column '{spec}' not in dataset.")
+        return X[spec].values.astype(float)
+
+    if isinstance(spec, dict) and "transform" in spec:
+        result = apply_transform(spec["transform"], result)
+    return result
 
 
 def predict_model(
@@ -177,6 +201,13 @@ def evaluate_linear_regression(
             "verdict": "Feature contains invalid values (NaN). "
                        "Check the transform domain.",
         }
+
+    # Scale each column to unit max-magnitude. Fitted R² is unchanged by this
+    # (linear regression is scale-invariant), but without it a column near 1e10
+    # (e.g. G·m1·m2/r²) makes the least-squares solver drop the O(1) columns.
+    scale = np.max(np.abs(X_feat), axis=0)
+    scale[scale == 0] = 1.0
+    X_feat = X_feat / scale
 
     model = LinearRegression()
     model.fit(X_feat, y)

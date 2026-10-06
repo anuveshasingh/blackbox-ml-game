@@ -25,7 +25,10 @@ def quadratic_ds(n=200, seed=42):
     return generate_dataset(get_puzzle("square_01"), n_samples=n, seed=seed)
 
 def piecewise_ds(n=200, seed=42):
-    return generate_dataset(get_puzzle("boss_piecewise"), n_samples=n, seed=seed)
+    """Flat-then-rising piecewise function: a step-friendly shape for a tree."""
+    x = np.random.default_rng(seed).uniform(0.0, 10.0, n)
+    y = np.where(x < 5.0, 2.0 * x, 10.0)
+    return {"X": pd.DataFrame({"x": x}), "y": y}
 
 
 # ---------------------------------------------------------------------------
@@ -135,12 +138,11 @@ class TestDecisionTree:
         assert dt["r2"] > 0.98
 
     def test_classification_returns_accuracy(self):
-        puzzle = get_puzzle("circle_01")
-        ds     = generate_dataset(puzzle, n_samples=300, seed=42)
-        from blackbox_game.transforms import apply_binary_transform
-        dist   = apply_binary_transform("distance", ds["X"]["x1"].values, ds["X"]["x2"].values)
-        X_feat = dist.reshape(-1, 1)
-        result = evaluate_decision_tree(X_feat, ds["y"], task="classification")
+        rng    = np.random.default_rng(42)
+        x1, x2 = rng.uniform(-6, 6, 300), rng.uniform(-6, 6, 300)
+        y      = (x1**2 + x2**2 < 4.0**2).astype(float)
+        X_feat = np.sqrt(x1**2 + x2**2).reshape(-1, 1)
+        result = evaluate_decision_tree(X_feat, y, task="classification")
         assert "accuracy" in result
         assert result["accuracy"] > 0.90
 

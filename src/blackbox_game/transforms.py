@@ -83,6 +83,10 @@ def _exp(x: np.ndarray) -> np.ndarray:
     """Exponential. Clips large inputs to avoid overflow."""
     return np.exp(np.clip(x, -100, 100))
 
+def _exp_neg(x: np.ndarray) -> np.ndarray:
+    """Decaying exponential e^(-x). Clips large inputs to avoid overflow."""
+    return np.exp(-np.clip(x, -100, 100))
+
 def _floor10(x: np.ndarray) -> np.ndarray:
     """floor(x / 10) * 10 — creates a staircase with step size 10."""
     return np.floor(x / 10.0) * 10.0
@@ -112,6 +116,7 @@ TRANSFORM_REGISTRY: dict[str, Callable[[np.ndarray], np.ndarray]] = {
     "sin_period7":  _sin_period7,
     "cos_period7":  _cos_period7,
     "exp":          _exp,
+    "exp_neg":      _exp_neg,
     "floor10":      _floor10,
     "step":         _step,
 }
@@ -133,6 +138,7 @@ TRANSFORM_DESCRIPTIONS: dict[str, str] = {
     "sin_period7":  "sin(2π·x/7)",
     "cos_period7":  "cos(2π·x/7)",
     "exp":          "eˣ",
+    "exp_neg":      "e⁻ˣ",
     "floor10":      "floor(x/10)·10",
     "step":         "step(x)  [1 if x≥0 else 0]",
 }

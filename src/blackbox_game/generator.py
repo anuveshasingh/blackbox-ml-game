@@ -18,8 +18,7 @@ import pandas as pd
 from typing import Any
 
 from .models import Puzzle, FunctionSpec
-
-FORMULA_EPSILON = 1.0
+from .physics import evaluate_formula
 
 # ---------------------------------------------------------------------------
 # Internal generators  (rng, n_samples, params) → (feature_dict, y_array)
@@ -220,6 +219,13 @@ def _fn_boss_multi(rng, n, p):
     return {"x1": x1, "x2": x2, "x3": x3}, x1 * x2 + p.get("c", 2.0) * x3
 
 
+def _fn_physics(rng, n, p):
+    """Sample each input uniformly over its range, then apply a physics formula."""
+    columns = {name: rng.uniform(lo, hi, n) for name, (lo, hi) in p["ranges"].items()}
+    values = {**p.get("fixed", {}), **columns}
+    return columns, evaluate_formula(p["formula"], values)
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -247,6 +253,7 @@ _FUNCTION_REGISTRY: dict[str, Any] = {
     "linear_distractor":"_fn_linear_distractor",  # resolved below
     "multi_transform":  _fn_multi_transform,
     "boss_multi":       _fn_boss_multi,
+    "physics":          _fn_physics,
 }
 _FUNCTION_REGISTRY["linear_distractor"] = _fn_linear_distractor
 
@@ -289,7 +296,6 @@ def generate_dataset(
 
     if puzzle.noise_std > 0.0:
         y = y + rng.normal(0.0, puzzle.noise_std, n_samples)
-    y = y + rng.uniform(-FORMULA_EPSILON, FORMULA_EPSILON, n_samples)
 
     return {"X": pd.DataFrame(feature_dict), "y": np.array(y, dtype=float)}
 
@@ -298,7 +304,6 @@ def evaluate_points(
     puzzle: Puzzle,
     X: pd.DataFrame,
     seed: int = 42,
-    include_noise: bool = True,
 ) -> dict:
     """Evaluate a puzzle's hidden function at user-supplied input points.
 
@@ -374,13 +379,13 @@ def evaluate_points(
         y = p.get("a", 1.0) * np.sin(x1) + p.get("b", 1.0) * x2**2 + p.get("c", 3.0) * x3
     elif fn_type == "boss_multi":
         y = x1 * x2 + p.get("c", 2.0) * x3
+    elif fn_type == "physics":
+        y = evaluate_formula(p["formula"], {**p.get("fixed", {}), **columns})
     else:
         raise ValueError(f"Unknown function type '{fn_type}'.")
 
     y = np.asarray(y, dtype=float)
-    if include_noise:
+    if puzzle.noise_std > 0.0:
         rng = np.random.default_rng(seed)
-        if puzzle.noise_std > 0.0:
-            y = y + rng.normal(0.0, puzzle.noise_std, len(values))
-        y = y + rng.uniform(-FORMULA_EPSILON, FORMULA_EPSILON, len(values))
+        y = y + rng.normal(0.0, puzzle.noise_std, len(values))
     return {"X": values, "y": y}

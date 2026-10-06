@@ -276,43 +276,35 @@ class TestEvaluateSubmissionAPI:
         assert bad["is_correct"] is False
         assert "explanation" not in bad
 
-    def test_piecewise_decision_tree_correct(self):
+    def test_projectile_y_correct(self):
         result = evaluate_submission(
-            puzzle_id="boss_piecewise",
-            model="decision_tree",
-            features=["identity:x"],
+            puzzle_id="projectile_y",
+            model="linear_regression",
+            features=[{"product": ["t", "sin:theta"]}, "square:t"],
         )
         assert result["is_correct"] is True
 
-    def test_product_binary_feature(self):
+    def test_shm_energy_correct(self):
         result = evaluate_submission(
-            puzzle_id="product_01",
+            puzzle_id="shm_energy",
             model="linear_regression",
-            features=[{"binary": "multiply", "a": "x1", "b": "x2"}],
+            features=["square:x", "square:v"],
         )
         assert result["is_correct"] is True
 
-    def test_abs_puzzle_correct(self):
+    def test_coulomb_2_correct(self):
         result = evaluate_submission(
-            puzzle_id="abs_01",
+            puzzle_id="coulomb_2",
             model="linear_regression",
-            features=["abs:x"],
+            features=["reciprocal:r1", "reciprocal:r2"],
         )
         assert result["is_correct"] is True
 
-    def test_cos_puzzle_correct(self):
+    def test_travelling_wave_correct(self):
         result = evaluate_submission(
-            puzzle_id="cos_01",
+            puzzle_id="travelling_wave",
             model="linear_regression",
-            features=["cos:x"],
-        )
-        assert result["is_correct"] is True
-
-    def test_phase_puzzle_correct(self):
-        result = evaluate_submission(
-            puzzle_id="phase_01",
-            model="linear_regression",
-            features=["sin:x", "cos:x"],
+            features=[{"sum": ["x", {"term": "t", "sign": -1}], "transform": "sin"}],
         )
         assert result["is_correct"] is True
 
