@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `.github/workflows/build-binaries.yml` — builds those binaries with PyInstaller, one per OS/arch, and publishes them to a GitHub release when a `v*` tag is pushed.
 - `README.md` — the only setup instructions a player needs (`uv run launch.py list`).
 
-The actual game — puzzles, dataset generation, image transforms, plotting (`play.py` and `src/blackbox_game/`) — lives on the **`preesha`** branch with its own `pyproject.toml`. That branch has no test suite; `plan.md` there is the design record and answer key. That is the branch to edit for gameplay/puzzle changes. This branch should only ever contain the launcher + the build workflow; don't add game source files or a `pyproject.toml` here.
+The actual game — puzzles, dataset generation, image transforms, plotting (`play.py` and `src/blackbox_game/`) — lives on the **`code`** branch with its own `pyproject.toml`. That branch has no test suite; `plan.md` there is the design record and answer key. That is the branch to edit for gameplay/puzzle changes. This branch should only ever contain the launcher + the build workflow; don't add game source files or a `pyproject.toml` here.
 
 ## Commands
 
@@ -20,19 +20,19 @@ uv run launch.py show puzzle_08 --plot
 uv run launch.py submit my_answers.json
 ```
 
-There is nothing to build, lint, or test on *this* branch — `launch.py` is a single dependency-free script. To work on game logic, use the `preesha` branch (or `git show origin/preesha:<path>`), which has its own `pyproject.toml` and `requirements.txt`.
+There is nothing to build, lint, or test on *this* branch — `launch.py` is a single dependency-free script. To work on game logic, use the `code` branch (or `git show origin/code:<path>`), which has its own `pyproject.toml` and `requirements.txt`.
 
 ## Releasing a new binary build
 
-1. Make the gameplay change on `preesha`, merge/commit it there.
+1. Make the gameplay change on `code`, merge/commit it there.
 2. On `preesha-binaries`, bump `RELEASE_TAG` in `launch.py` to the new version.
-3. Push a tag matching that version (`git tag vX.Y.Z && git push --tags`). The workflow triggers on any `v*` tag push, checks out the **current tip of `preesha`** (not a pinned commit — see gotcha below), builds four binaries with PyInstaller, zips each, and publishes them to a GitHub release named after the tag.
+3. Push a tag matching that version (`git tag vX.Y.Z && git push --tags`). The workflow triggers on any `v*` tag push, checks out the **current tip of `code`** (not a pinned commit — see gotcha below), builds four binaries with PyInstaller, zips each, and publishes them to a GitHub release named after the tag.
 4. Confirm the release assets exist before telling players to update — `launch.py` will 404 instead of falling back if the tag/assets don't exist yet.
 
 ## Architecture gotchas (read before touching `launch.py` or the workflow)
 
 - **PyInstaller must build `--onedir`, never `--onefile`.** A onefile binary re-extracts its entire payload (numpy/pandas/scikit-learn/matplotlib, ~100MB+) into a fresh temp directory on *every single launch* — this was the original "every command is way too slow" bug. Onedir + the cache in `binary_path()` means extraction happens once per machine, ever.
-- **The PyInstaller step must keep `--collect-data blackbox_game`.** It bundles the package's non-Python files — the curated image-puzzle PNGs in `src/blackbox_game/curated/`. Without it the build succeeds but every image puzzle crashes at runtime. Any new data file the game reads must live inside the `blackbox_game` package (and be listed under `[tool.setuptools.package-data]` on `preesha`) to be bundled.
+- **The PyInstaller step must keep `--collect-data blackbox_game`.** It bundles the package's non-Python files — the curated image-puzzle PNGs in `src/blackbox_game/curated/`. Without it the build succeeds but every image puzzle crashes at runtime. Any new data file the game reads must live inside the `blackbox_game` package (and be listed under `[tool.setuptools.package-data]` on `code`) to be bundled.
 - **The asset name in `launch.py`'s `_ASSET_NAMES` must exactly match the `asset:` value in the workflow's build matrix** — no extensions baked in (including on Windows: the asset is `blackbox-ml-game-windows-x86_64`, not `...x86_64.exe`). `binary_path()` is the only place that appends `.exe`, and only for the extracted executable path. A mismatch here silently 404s the download on that platform.
 - **`RELEASE_TAG` pins the exact release `launch.py` downloads.** It will never auto-update to a newer tag; that's deliberate (players shouldn't get a surprise mid-competition binary swap), but it means bumping the game requires both a new tag/release *and* a `launch.py` edit on this branch.
 - **Cache layout:** `~/.cache/blackbox-ml-game/<RELEASE_TAG>/<asset-name>/` holds the extracted onedir bundle; the executable inside shares the same name (plus `.exe` on Windows). Bumping `RELEASE_TAG` naturally invalidates old caches by pointing at a new path — old versions' cached bundles are simply left behind (harmless, just disk space).

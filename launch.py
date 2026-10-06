@@ -7,7 +7,7 @@ matches the current machine, downloads + caches it on first use, and then
 replaces itself with that binary (passing through all CLI arguments).
 
 The actual game (puzzles, scoring, plotting) lives in `play.py` and
-`src/blackbox_game/` on the `preesha` branch, and gets compiled into the
+`src/blackbox_game/` on the `code` branch, and gets compiled into the
 binaries this script downloads. This branch (`preesha-binaries`) only
 ever contains this launcher plus the GitHub Actions workflow that builds
 those binaries — see CLAUDE.md before changing either half.
