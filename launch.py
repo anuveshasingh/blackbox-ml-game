@@ -26,7 +26,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 REPOSITORY = "anuveshasingh/blackbox-ml-game"
-RELEASE_TAG = "v0.3.1"
+RELEASE_TAG = "v0.3.2"
 
 # Must match the `asset:` values in .github/workflows/build-binaries.yml
 # exactly (no extensions baked in here — see CLAUDE.md "Windows asset
