@@ -28,6 +28,7 @@ There is nothing to build, lint, or test on *this* branch — `launch.py` is a s
 2. On `binaries`, bump `RELEASE_TAG` in `launch.py` to the new version.
 3. Push a tag matching that version (`git tag vX.Y.Z && git push --tags`). The workflow triggers on any `v*` tag push, checks out the **current tip of `code`** (not a pinned commit — see gotcha below), builds four binaries with PyInstaller, zips each, and publishes them to a GitHub release named after the tag.
 4. Confirm the release assets exist before telling players to update — `launch.py` will 404 instead of falling back if the tag/assets don't exist yet.
+5. Fast-forward `main` to `binaries`: `git push origin binaries:main`. `main` is the GitHub default branch, so a plain `git clone` gets `main`'s `launch.py` and its `RELEASE_TAG`. If this step is skipped, players who clone without `-b binaries` keep downloading the previous release.
 
 ## Architecture gotchas (read before touching `launch.py` or the workflow)
 
