@@ -35,7 +35,7 @@ The first run downloads the correct game executable for the computer and caches 
 |---|---|
 | `puzzle_01` to `puzzle_06` | Numerical (beginner) |
 | `puzzle_07` to `puzzle_10` | Numerical (physics) |
-| `puzzle_11` to `puzzle_20` | Image |
+| `puzzle_11` to `puzzle_17` | Image |
 
 ## Commands
 
@@ -51,17 +51,17 @@ Create its plots. Physics puzzles also get a 3D plot that opens in VS Code; the 
 uv run launch.py show puzzle_07 --plot
 ```
 
-For image puzzles, `show` writes `input.png` and `output.png`. Try your own transforms on the input picture; they are applied left to right:
+For image puzzles, `show` writes each input picture with its output (`input.png`/`output.png`, or `input_1.png`/`output_1.png` and `input_2.png`/`output_2.png` when a puzzle shows two examples):
 
 ```bash
-uv run launch.py show puzzle_18
-uv run launch.py apply puzzle_18 --apply invert rotate_chunks
+uv run launch.py show puzzle_11
 ```
 
-Try transforms on any picture of your own (`.jpg`, `.jpeg` or `.png` only). It is cropped to a square and resized to 256×256 first, and results go to `outputs/custom/`:
+To test a guess, use `apply` on one picture at a time: give it with `--input` (`.jpg`, `.jpeg` or `.png` only) and the transform names after `--apply`, applied left to right. The picture is cropped to a square and resized to 256×256 first, and the result goes to `outputs/apply/`. It can be a puzzle's input or any picture of your own:
 
 ```bash
-uv run launch.py apply --image my_photo.jpg --apply invert vignette
+uv run launch.py apply --input outputs/puzzle_11/input_1.png --apply rotate_chunks
+uv run launch.py apply --input my_photo.jpg --apply invert vignette
 ```
 
 Everything is saved under:
