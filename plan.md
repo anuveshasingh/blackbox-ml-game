@@ -234,6 +234,6 @@ Why they behave this way:
 ## Packaging
 
 - Runtime dependencies: `numpy`, `pandas`, `scikit-learn`, `matplotlib`, `Pillow`. The curated PNGs are declared as package data.
-- The player binaries are built from the tip of `preesha` by the workflow on `preesha-binaries`. Its PyInstaller step uses `--collect-data blackbox_game`, which bundles `curated/`. Any new file the game reads at runtime must live inside the `blackbox_game` package and match `package-data`, or the binaries will not include it.
+- The player binaries are built from the tip of `code` by the workflow on the `binaries` branch. Its PyInstaller step uses `--collect-data blackbox_game`, which bundles `curated/`. Any new file the game reads at runtime must live inside the `blackbox_game` package and match `package-data`, or the binaries will not include it.
 - Player pictures for `apply --input` must be `.jpg`, `.jpeg` or `.png` (checked by extension and by the file's real format). All source pictures are kept as JPEG or PNG.
 - There is no test suite. Check changes by running `show`, `apply`, `points` and `residuals` on the affected puzzles.
