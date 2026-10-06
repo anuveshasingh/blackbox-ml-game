@@ -8,11 +8,10 @@ COMMANDS
       List all puzzle IDs.
 
   python play.py show <puzzle_id> [--plot]
-      Show a puzzle's description and data. Image puzzles write input.png and output.png.
+      Show a puzzle's description and data. Image puzzles write their input/output pictures.
 
-  python play.py apply <puzzle_id> --apply NAME [NAME ...]
-  python play.py apply --image PATH --apply NAME [NAME ...]
-      Apply image transforms left to right to a puzzle's input or your own picture.
+  python play.py apply --input IMAGE --apply NAME [NAME ...]
+      Apply image transforms left to right to one .jpg/.jpeg/.png picture.
 
   python play.py transforms
       Print all available transformation keys.
@@ -153,14 +152,11 @@ def cmd_show(args):
 
 
 def _show_image_puzzle(puzzle, puzzle_id: str) -> None:
-    """Write the two pictures for an image puzzle and show where they are."""
+    """Write each input/output pair for an image puzzle and show where they are."""
     from blackbox_game.images import render_image_puzzle
     from blackbox_game.viewer import open_in_vscode
 
-    params = puzzle.function.parameters
-    input_png, output_png = render_image_puzzle(
-        params["image"], params["transform"], _ensure_puzzle_dir(puzzle_id),
-    )
+    pairs = render_image_puzzle(puzzle, _ensure_puzzle_dir(puzzle_id))
 
     print(f"\n{SEP2}")
     print(f"  ID: {_c(_puzzle_label(puzzle_id))}")
@@ -169,11 +165,13 @@ def _show_image_puzzle(puzzle, puzzle_id: str) -> None:
     for line in _wrap(puzzle.description):
         print(f"  {line}")
     print()
-    print(f"  {_b('Input:')}  {input_png}")
-    print(f"  {_b('Output:')} {output_png}")
-    print()
-    if open_in_vscode([input_png, output_png]):
-        print("  Opened both pictures in VS Code.")
+    for input_png, output_png in pairs:
+        print(f"  {_b('Input:')}  {input_png}")
+        print(f"  {_b('Output:')} {output_png}")
+        print()
+    files = [path for pair in pairs for path in pair]
+    if open_in_vscode(files):
+        print(f"  Opened {len(files)} pictures in VS Code.")
     print(SEP)
     print(_d("  Record your result on the leaderboard."))
     print()
@@ -182,49 +180,28 @@ def _show_image_puzzle(puzzle, puzzle_id: str) -> None:
 # ── Command: apply ────────────────────────────────────────────────────────
 
 def cmd_apply(args):
-    from blackbox_game.images import (
-        IMAGE_TRANSFORMS, apply_pipeline, load_user_image, puzzle_input_image, save_png,
-    )
+    from blackbox_game.images import IMAGE_TRANSFORMS, apply_pipeline, load_user_image, save_png
     from blackbox_game.viewer import open_in_vscode
 
-    if (args.puzzle_id is None) == (args.image is None):
-        print(_r("Give either a puzzle ID or --image PATH (not both)."))
-        sys.exit(1)
     unknown = [name for name in args.apply if name not in IMAGE_TRANSFORMS]
     if unknown:
         print(_r(f"Unknown transform(s): {', '.join(unknown)}"))
         print(_d(f"  Valid names: {', '.join(IMAGE_TRANSFORMS)}"))
         sys.exit(1)
+    try:
+        source = load_user_image(args.input)
+    except (OSError, ValueError) as exc:
+        print(_r(f"Could not read the image {args.input}: {exc}"))
+        sys.exit(1)
 
-    steps_name = "_".join(args.apply)
-    if args.image is not None:
-        try:
-            source = load_user_image(args.image)
-        except (OSError, ValueError) as exc:
-            print(_r(f"Could not read the image {args.image}: {exc}"))
-            sys.exit(1)
-        stem = Path(args.image).name.split(".")[0] or "image"
-        out_dir = _output_root() / "custom"
-        save_png(source, out_dir / f"{stem}.png")
-        output = out_dir / f"{stem}_{steps_name}.png"
-    else:
-        puzzle_id = _resolve_puzzle_id(args.puzzle_id)
-        try:
-            puzzle = get_puzzle(puzzle_id)
-        except KeyError as e:
-            print(_r(e.args[0]))
-            sys.exit(1)
-        if puzzle.function.type != "image":
-            print(_r("apply works on image puzzles only; this puzzle has numeric inputs."))
-            sys.exit(1)
-        source = puzzle_input_image(puzzle)
-        output = _ensure_puzzle_dir(puzzle_id) / f"input_{steps_name}.png"
+    stem = Path(args.input).name.split(".")[0] or "image"
+    out_dir = _output_root() / "apply"
+    resized = save_png(source, out_dir / f"{stem}.png")
+    output = save_png(apply_pipeline(source, args.apply), out_dir / f"{stem}_{'_'.join(args.apply)}.png")
 
-    save_png(apply_pipeline(source, args.apply), output)
     print(f"\n{_g('✓')} Applied left to right: {_b(' → '.join(args.apply))}")
-    if args.image is not None:
-        print(f"  Input (256×256): {_b(str(output.parent / (stem + '.png')))}")
-    print(f"  Written: {_b(str(output))}")
+    print(f"  Input (256×256): {_b(str(resized))}")
+    print(f"  Written:         {_b(str(output))}")
     if open_in_vscode([output]):
         print("  Opened in VS Code.")
     print()
@@ -549,9 +526,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("transforms", help="List all available transforms")
 
     # apply
-    p_apply = sub.add_parser("apply", help="Apply image transforms to a puzzle's input or your own picture")
-    p_apply.add_argument("puzzle_id", nargs="?", help="Image puzzle ID (e.g. puzzle_11)")
-    p_apply.add_argument("--image", help="Your own picture instead of a puzzle (.jpg, .jpeg or .png)")
+    p_apply = sub.add_parser("apply", help="Apply image transforms to one picture")
+    p_apply.add_argument("--input", required=True, metavar="IMAGE",
+                         help="The picture to transform (.jpg, .jpeg or .png)")
     p_apply.add_argument("--apply", nargs="+", required=True, metavar="TRANSFORM",
                          help="Transform names, applied left to right (see `transforms`)")
 

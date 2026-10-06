@@ -4,14 +4,14 @@ This file is the answer key and design record for the Blackbox ML Game. The code
 
 ## Catalogue at a glance
 
-There are **20 puzzles**, numbered `puzzle_01` to `puzzle_20` with no gaps. Numbers follow catalogue order. Public IDs never reveal the puzzle's name, title, function, or tier.
+There are **17 puzzles**, numbered `puzzle_01` to `puzzle_17` with no gaps. Numbers follow catalogue order. Public IDs never reveal the puzzle's name, title, function, or tier.
 
 | Puzzles | Round | Kind |
 |---|---|---|
 | `puzzle_01` – `puzzle_06` | 1 — Beginner | Numerical, one obvious feature |
 | `puzzle_07` – `puzzle_10` | 2 — Physics | Numerical, two inputs, fixed constants |
-| `puzzle_11` – `puzzle_17` | 3 — Image, single transform | Curated picture + one transform |
-| `puzzle_18` – `puzzle_20` | 3 — Image, combinations | Curated picture + several transforms |
+| `puzzle_11` – `puzzle_14` | 3 — Image, single transform | One transform, shown on one or two example pictures |
+| `puzzle_15` – `puzzle_17` | 3 — Image, combinations | One picture + several transforms |
 
 ## Text shown to players
 
@@ -19,7 +19,7 @@ Puzzle IDs, titles and tiers are never shown. The only text is each puzzle's `de
 
 - **Beginner:** none. The data is the whole puzzle.
 - **Physics:** the setup and the fixed values, worded like an exam problem. It must state every fixed value and nothing about the answer.
-- **Image:** the same neutral line for every image puzzle — "Work out what was done to input.png to make output.png." It must not hint at the transform, the number of steps, or whether order matters.
+- **Image:** the same neutral line for every image puzzle — "Work out what was done to each input picture to make its output picture." It must not hint at the transform, the number of steps, or whether order matters.
 
 ## Code layout — where to make changes
 
@@ -33,6 +33,7 @@ The engine is done; later work should only touch puzzle definitions and images.
 | Feature transforms players can use | `src/blackbox_game/transforms.py` |
 | An image transform or its parameters | `src/blackbox_game/images.py` (`IMAGE_TRANSFORMS` and the constants at the top) |
 | A combination puzzle's steps or picture | `src/blackbox_game/images.py` (`PIPELINES`) |
+| Which pictures an image puzzle shows (one, or several examples) | `src/blackbox_game/puzzles.py` (the `images` list in `_image(...)`) |
 | The curated pictures | `src/blackbox_game/curated/*.png`, 256×256 RGB |
 | Sample sizes | `src/blackbox_game/generator.py` (`SAMPLE_COUNTS`) |
 
@@ -42,9 +43,8 @@ Then update this file to match.
 
 ```bash
 uv run python play.py list                          # IDs only, no titles or tiers
-uv run python play.py show puzzle_07 [--plot]       # description + data, or two pictures
-uv run python play.py apply puzzle_18 --apply ghost_echo solarise   # on a puzzle's input.png
-uv run python play.py apply --image photo.jpg --apply invert vignette  # on your own picture
+uv run python play.py show puzzle_07 [--plot]       # description + data, or the input/output pictures
+uv run python play.py apply --input photo.jpg --apply invert vignette   # one picture per command
 uv run python play.py transforms                    # every feature and image transform name
 uv run python play.py points puzzle_07 --input points.txt [--plot]
 uv run python play.py residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' [--plot]
@@ -52,7 +52,7 @@ uv run python play.py residuals puzzle_07 --input points.txt --features square:t
 
 - `show` prints `ID: puzzle_NN`, the puzzle description (if any), the input columns and the sample rows. It does not print a title, a difficulty tier, or a list of models.
 - There is **no submission or scoring code**. Players record results on the separate leaderboard.
-- `apply` works on an image puzzle's input picture, or on any picture given with `--image` (`.jpg`, `.jpeg` or `.png` only; other formats are rejected). A player's picture is centre-cropped to a square and resized to 256×256 first, so it behaves exactly like a puzzle picture. `points` and `residuals` work on numerical puzzles only.
+- `apply` takes exactly one picture per command, given with `--input`, like `points --input`. It is not tied to a puzzle: the picture can be a puzzle's `input.png` or any picture the player has. Only `.jpg`, `.jpeg` and `.png` are accepted (checked by extension and by the file's real format). The picture is centre-cropped to a square and resized to 256×256 first, so it behaves exactly like a puzzle picture; applying a puzzle's transform to its `input.png` reproduces its `output.png` exactly. `points` and `residuals` work on numerical puzzles only.
 
 ## Output folder
 
@@ -71,18 +71,21 @@ outputs/
 │   │       └── puzzle_07_y_vs_theta_t.ply
 │   ├── <input-name>_puzzle_07_output.csv          (from points)
 │   └── <input-name>_puzzle_07_residuals.csv       (from residuals)
-├── puzzle_18/
+├── puzzle_11/                                     (two example pictures)
+│   ├── input_1.png, output_1.png
+│   └── input_2.png, output_2.png
+├── puzzle_15/                                     (one picture)
 │   ├── input.png
-│   ├── output.png
-│   └── input_ghost_echo_solarise.png             (from apply)
-└── custom/                                        (from apply --image)
+│   └── output.png
+└── apply/                                         (from apply --input)
     ├── photo.png                                  (the 256×256 version of photo.jpg)
     └── photo_invert_vignette.png
 ```
 
 - `show` does not write a CSV; the data is printed in the terminal. Plots are written only with `--plot`.
 - `points --plot` and `residuals --plot` write a PNG beside their CSV.
-- `apply` names its result `input_<transform names joined by _>.png`, or `<picture name>_<transform names>.png` under `custom/` for `--image`.
+- An image puzzle with one picture writes `input.png` and `output.png`; one with two example pictures writes `input_1.png`/`output_1.png` and `input_2.png`/`output_2.png`.
+- `apply` writes `<picture name>_<transform names joined by _>.png` under `apply/`, plus the 256×256 version of the picture it worked on.
 
 ## Numerical data and plots
 
@@ -145,9 +148,9 @@ Binary transforms: `multiply`, `divide`, `add`, `subtract`, `distance`.
 
 `residuals` fits `linear_regression` (default) or a depth-4 `decision_tree` (`src/blackbox_game/fitting.py`). Linear regression scales each feature column before fitting; this does not change the fit, but stops a very large column from swamping the others.
 
-## Round 3 — Image Processing (`puzzle_11` – `puzzle_20`)
+## Round 3 — Image Processing (`puzzle_11` – `puzzle_17`)
 
-No data points or plots. `show` writes `input.png` and `output.png` (both 256×256 RGB) into the puzzle's folder and opens them in VS Code. Players work out what was done to the first picture to get the second, and can test guesses with `apply`.
+No data points or plots. `show` writes each input/output pair (all 256×256 RGB) into the puzzle's folder and opens them in VS Code. A single-transform puzzle may show **two example pictures of the same transform**, one easier and one harder; they are one puzzle, not two. Players work out what was done to each input to get its output, and can test guesses with `apply`.
 
 ### Curated images
 
@@ -158,15 +161,15 @@ Each source picture is converted once to a 256×256 PNG in `src/blackbox_game/cu
 
 | Name | Source file | Used by |
 |---|---|---|
-| `lsd` | `lsd.jpg` | `puzzle_11` |
-| `checkmate` | `checkmate.jpeg` (chess endgame) | `puzzle_12` |
-| `moon` | `moon.jpg` | `puzzle_13` |
-| `molecule` | `smile.png` (achiral molecule) | `puzzle_14` |
-| `matrix` | `matrix.png` | `puzzle_15`, `puzzle_18` |
-| `marbles` | `marbles.png` (blue and green marbles) | `puzzle_16` |
-| `monet` | `monet.jpg` (blue Monet painting) | `puzzle_17` |
-| `doctor_strange` | `doctor_strange.png` | `puzzle_19` |
-| `pexels` | `pexels.png` | `puzzle_20` |
+| `lsd` | `lsd.jpg` | `puzzle_11` (example 1) |
+| `checkmate` | `checkmate.jpeg` (chess endgame) | `puzzle_11` (example 2) |
+| `moon` | `moon.jpg` | `puzzle_12` (example 1) |
+| `molecule` | `smile.png` (achiral molecule) | `puzzle_12` (example 2) |
+| `matrix` | `matrix.png` | `puzzle_13`, `puzzle_15` |
+| `marbles` | `marbles.png` (blue and green marbles) | `puzzle_14` (example 1) |
+| `monet` | `monet.jpg` (blue Monet painting) | `puzzle_14` (example 2) |
+| `doctor_strange` | `doctor_strange.png` | `puzzle_16` |
+| `pexels` | `pexels.png` | `puzzle_17` |
 
 ### All image transforms
 
@@ -191,15 +194,14 @@ These 12 names are accepted by `apply`. Each takes and returns a 256×256 RGB im
 
 ### Single-transform puzzles
 
-| Puzzle | Image | Transform | Notes |
-|---|---|---|---|
-| `puzzle_11` | `lsd` | `rotate_chunks` | Busy pattern: the tile seams give it away |
-| `puzzle_12` | `checkmate` | `rotate_chunks` | Chess endgame: rotated pieces and broken board pattern |
-| `puzzle_13` | `moon` | `mirror_sum` | |
-| `puzzle_14` | `molecule` | `mirror_sum` | Achiral molecule; the flipped copy coincides with the original |
-| `puzzle_15` | `matrix` | `circular_shift` | |
-| `puzzle_16` | `marbles` | `swap_rgb_rbg` | Hint image: blue and green marbles trade colours |
-| `puzzle_17` | `monet` | `swap_rgb_rbg` | Tough image: a mostly blue painting turns green |
+Each row is one puzzle. Where two pictures are listed, both are examples of the same transform, shown together.
+
+| Puzzle | Transform | Example 1 | Example 2 | Notes |
+|---|---|---|---|---|
+| `puzzle_11` | `rotate_chunks` | `lsd` | `checkmate` | The busy pattern hides the tiles; the chess endgame shows them through rotated pieces and a broken board |
+| `puzzle_12` | `mirror_sum` | `moon` | `molecule` | The achiral molecule's flipped copy coincides with the original |
+| `puzzle_13` | `circular_shift` | `matrix` | — | |
+| `puzzle_14` | `swap_rgb_rbg` | `marbles` | `monet` | Hint picture: blue and green marbles trade colours. Tough picture: a mostly blue painting turns green |
 
 ### Combination puzzles
 
@@ -207,15 +209,15 @@ Steps are applied left to right as listed. "Commutes" means every ordering of th
 
 | Puzzle | Image | Steps | Commutes? |
 |---|---|---|---|
-| `puzzle_18` | `matrix` | `ghost_echo`, `solarise` | No |
-| `puzzle_19` | `doctor_strange` | `stretch_horizontal`, `posterise`, `swap_rgb_bgr` | Yes |
-| `puzzle_20` | `pexels` | `invert`, `circular_shift`, `rotate_chunks` | No |
+| `puzzle_15` | `matrix` | `ghost_echo`, `solarise` | No |
+| `puzzle_16` | `doctor_strange` | `stretch_horizontal`, `posterise`, `swap_rgb_bgr` | Yes |
+| `puzzle_17` | `pexels` | `invert`, `circular_shift`, `rotate_chunks` | No |
 
 Why they behave this way:
 
-- **18:** solarise is not linear, so solarising then blending gives different values from blending then solarising.
-- **19:** the stretch only moves pixels, and posterise and the swap act on each pixel's own values, so the order never matters.
-- **20:** invert commutes with both, but the shift (32 px) is not a whole number of tiles (64 px), so shifting before or after rotating the tiles moves different pixels.
+- **15:** solarise is not linear, so solarising then blending gives different values from blending then solarising.
+- **16:** the stretch only moves pixels, and posterise and the swap act on each pixel's own values, so the order never matters.
+- **17:** invert commutes with both, but the shift (32 px) is not a whole number of tiles (64 px), so shifting before or after rotating the tiles moves different pixels.
 
 ### Rules for image transforms
 
@@ -233,5 +235,5 @@ Why they behave this way:
 
 - Runtime dependencies: `numpy`, `pandas`, `scikit-learn`, `matplotlib`, `Pillow`. The curated PNGs are declared as package data.
 - The player binaries are built from the tip of `preesha` by the workflow on `preesha-binaries`. Its PyInstaller step uses `--collect-data blackbox_game`, which bundles `curated/`. Any new file the game reads at runtime must live inside the `blackbox_game` package and match `package-data`, or the binaries will not include it.
-- Player pictures for `apply --image` must be `.jpg`, `.jpeg` or `.png` (checked by extension and by the file's real format). All source pictures are kept as JPEG or PNG.
+- Player pictures for `apply --input` must be `.jpg`, `.jpeg` or `.png` (checked by extension and by the file's real format). All source pictures are kept as JPEG or PNG.
 - There is no test suite. Check changes by running `show`, `apply`, `points` and `residuals` on the affected puzzles.

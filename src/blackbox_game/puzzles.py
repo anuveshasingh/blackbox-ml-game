@@ -109,31 +109,29 @@ _PHYS_COULOMB_2 = _physics(
 
 #: The only text shown for any image puzzle. Kept neutral on purpose: it must
 #: not hint at the transform, the number of steps, or whether order matters.
-_IMAGE_DESCRIPTION = "Work out what was done to input.png to make output.png."
+_IMAGE_DESCRIPTION = "Work out what was done to each input picture to make its output picture."
 
 
-def _image(id: str, image: str, transform: str) -> Puzzle:
-    """``transform`` is a name in images.IMAGE_TRANSFORMS or images.PIPELINES."""
+def _image(id: str, images: list[str], transform: str) -> Puzzle:
+    """``images`` are curated picture names: one picture, or several examples of the
+    same transform. ``transform`` is a name in images.IMAGE_TRANSFORMS or images.PIPELINES."""
     return Puzzle(
         id=id,
         difficulty=3,
         description=_IMAGE_DESCRIPTION,
         input_features=[],
-        function=FunctionSpec(type="image", parameters={"image": image, "transform": transform}),
+        function=FunctionSpec(type="image", parameters={"images": list(images), "transform": transform}),
     )
 
 
-# Single transforms
-_IMG_CHUNKS_LSD = _image("chunks_lsd", "lsd", "rotate_chunks")
-_IMG_CHUNKS_CHESS = _image("chunks_checkmate", "checkmate", "rotate_chunks")
-_IMG_MIRROR_MOON = _image("mirror_moon", "moon", "mirror_sum")
-_IMG_MIRROR_MOLECULE = _image("mirror_molecule", "molecule", "mirror_sum")
-_IMG_SHIFT = _image("circular_shift", "matrix", "circular_shift")
-_IMG_RBG_MARBLES = _image("rbg_marbles", "marbles", "swap_rgb_rbg")
-_IMG_RBG_MONET = _image("rbg_monet", "monet", "swap_rgb_rbg")
+# Single transforms. Two pictures = two examples of the same puzzle.
+_IMG_CHUNKS = _image("rotate_chunks", ["lsd", "checkmate"], "rotate_chunks")
+_IMG_MIRROR = _image("mirror_sum", ["moon", "molecule"], "mirror_sum")
+_IMG_SHIFT = _image("circular_shift", ["matrix"], "circular_shift")
+_IMG_RBG = _image("swap_rgb_rbg", ["marbles", "monet"], "swap_rgb_rbg")
 
 # Pipelines, in images.PIPELINES order.
-_IMG_PIPELINES = [_image(name, image, name) for name, (image, _) in PIPELINES.items()]
+_IMG_PIPELINES = [_image(name, [image], name) for name, (image, _) in PIPELINES.items()]
 
 
 # ===========================================================================
@@ -145,8 +143,7 @@ PUZZLE_REGISTRY: dict[str, Puzzle] = {
     for p in [
         _LINE_01, _LINE_02, _SQUARE_01, _SQRT_01, _LOG_01, _DISTRACTOR_01,
         _PHYS_PROJECTILE_Y, _PHYS_SHM_ENERGY, _PHYS_TRAVELLING_WAVE, _PHYS_COULOMB_2,
-        _IMG_CHUNKS_LSD, _IMG_CHUNKS_CHESS, _IMG_MIRROR_MOON, _IMG_MIRROR_MOLECULE,
-        _IMG_SHIFT, _IMG_RBG_MARBLES, _IMG_RBG_MONET,
+        _IMG_CHUNKS, _IMG_MIRROR, _IMG_SHIFT, _IMG_RBG,
         *_IMG_PIPELINES,
     ]
 }

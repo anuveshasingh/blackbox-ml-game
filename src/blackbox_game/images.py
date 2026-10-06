@@ -3,13 +3,14 @@ images.py — Image puzzles: curated inputs, named transforms and pipelines.
 
 Every image puzzle takes a curated 256×256 RGB PNG (see ``curated/``) and
 applies either one named transform (``IMAGE_TRANSFORMS``) or a pipeline of
-them (``PIPELINES``). ``render_image_puzzle`` writes two files for the player:
+them (``PIPELINES``). A puzzle may show one picture or several examples of the
+same transform. ``render_image_puzzle`` writes, per picture:
 
-    input.png   the curated image
-    output.png  the transformed result
+    input.png,   output.png     (one picture)
+    input_N.png, output_N.png   (several pictures, N = 1, 2, ...)
 
-``play.py apply`` runs any sequence of ``IMAGE_TRANSFORMS`` on a puzzle's
-input picture, or on a JPEG/PNG the player supplies (``load_user_image``).
+``play.py apply`` runs any sequence of ``IMAGE_TRANSFORMS`` on one JPEG/PNG
+the player supplies (``load_user_image``).
 All transforms keep the canvas fixed at 256×256 and are deterministic.
 """
 
@@ -54,7 +55,7 @@ def load_curated(name: str) -> np.ndarray:
     return np.asarray(Image.open(CURATED_DIR / f"{name}.png").convert("RGB"), dtype=np.uint8)
 
 
-#: File types accepted for a player's own picture (``play.py apply --image``).
+#: File types accepted for a player's own picture (``play.py apply --input``).
 USER_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png")
 
 
@@ -214,9 +215,15 @@ def pipeline_commutes(name: str) -> bool:
 # Rendering
 # ---------------------------------------------------------------------------
 
-def puzzle_input_image(puzzle) -> np.ndarray:
-    """The input.png content for an image puzzle."""
-    return load_curated(puzzle.function.parameters["image"])
+def picture_suffixes(count: int) -> list[str]:
+    """File-name suffix per picture: "" for a single picture, "_1", "_2", ... otherwise."""
+    return [""] if count == 1 else [f"_{i}" for i in range(1, count + 1)]
+
+
+def puzzle_pictures(puzzle) -> list[tuple[str, np.ndarray]]:
+    """(suffix, input picture) for each example picture of an image puzzle."""
+    names = puzzle.function.parameters["images"]
+    return list(zip(picture_suffixes(len(names)), (load_curated(n) for n in names)))
 
 
 def save_png(img: np.ndarray, path: Path) -> Path:
@@ -225,12 +232,14 @@ def save_png(img: np.ndarray, path: Path) -> Path:
     return path
 
 
-def render_image_puzzle(image_name: str, transform: str, out_dir: Path) -> list[Path]:
-    """Write input.png and output.png for an image puzzle. Returns both paths."""
-    input_img = load_curated(image_name)
+def render_image_puzzle(puzzle, out_dir: Path) -> list[tuple[Path, Path]]:
+    """Write the input/output pair for each of a puzzle's pictures. Returns the pairs."""
+    transform = puzzle.function.parameters["transform"]
     steps = PIPELINES[transform][1] if transform in PIPELINES else [transform]
-    output_img = apply_pipeline(input_img, steps)
-    return [
-        save_png(input_img, out_dir / "input.png"),
-        save_png(output_img, out_dir / "output.png"),
-    ]
+    pairs = []
+    for suffix, input_img in puzzle_pictures(puzzle):
+        pairs.append((
+            save_png(input_img, out_dir / f"input{suffix}.png"),
+            save_png(apply_pipeline(input_img, steps), out_dir / f"output{suffix}.png"),
+        ))
+    return pairs
