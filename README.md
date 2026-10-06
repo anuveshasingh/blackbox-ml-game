@@ -31,33 +31,40 @@ The first run downloads the correct game executable for the computer and caches 
 
 ## Puzzle Groups
 
-| Difficulty | Puzzles |
+| Puzzles | Kind |
 |---|---|
-| Beginner | `puzzle_01` through `puzzle_06` |
-| Intermediate | `puzzle_07` through `puzzle_15` |
-| Challenge | `puzzle_16` through `puzzle_25` |
+| `puzzle_01` to `puzzle_06` | Numerical (beginner) |
+| `puzzle_07` to `puzzle_10` | Numerical (physics) |
+| `puzzle_11` to `puzzle_21` | Image |
 
 ## Commands
 
-Show a puzzle and its sample data:
+Show a puzzle and its sample data (25 rows for beginner puzzles, 100 for physics):
 
 ```bash
-uv run launch.py show puzzle_08
+uv run launch.py show puzzle_07
 ```
 
-Create its base plot:
+Create its plots. Physics puzzles also get a 3D plot that opens in VS Code; the viewer extension installs itself the first time:
 
 ```bash
-uv run launch.py show puzzle_08 --plot
+uv run launch.py show puzzle_07 --plot
 ```
 
-Plots and generated CSVs are saved under:
+For image puzzles, `show` writes `input.png` and `output.png`. Try your own transforms on the input picture; they are applied left to right:
+
+```bash
+uv run launch.py show puzzle_17
+uv run launch.py apply puzzle_17 --apply invert rotate
+```
+
+Everything is saved under:
 
 ```text
-outputs/puzzle_08/
+outputs/puzzle_XX/
 ```
 
-List transformations:
+List feature transformations and image transform names:
 
 ```bash
 uv run launch.py transforms
@@ -66,15 +73,15 @@ uv run launch.py transforms
 Evaluate custom input points:
 
 ```bash
-uv run launch.py points puzzle_17 --input points.txt --plot
+uv run launch.py points puzzle_07 --input points.txt --plot
 ```
 
 Fit a model and inspect residuals:
 
 ```bash
-uv run launch.py residuals puzzle_08 \
+uv run launch.py residuals puzzle_07 \
   --input points.txt \
-  --features identity:x sin:x \
+  --features square:t '{"product": ["t", "sin:theta"]}' \
   --model linear_regression \
   --plot
 ```
@@ -113,9 +120,11 @@ The two-column version may also use spaces:
 
 Do not include a `y` column or transformed columns. The game calculates `y`; transformation names belong in the `--features` argument.
 
-## Noise
+Features in `--features` are a column (`t`), a transform of a column (`square:t`), or JSON in single quotes for combinations: `'{"product": ["t", "sin:theta"]}'`, `'{"sum": ["x", {"term": "t", "sign": -1}], "transform": "sin"}'`, `'{"binary": "multiply", "a": "x1", "b": "x2"}'`. Run `transforms` for every name.
 
-The generated equations include reproducible random noise using seed `42`. The formula noise is uniformly bounded by `1.0`, and plots add visual jitter bounded by `1.0`. Random noise is not a feature and should not be treated as part of an equation.
+## Exact values
+
+Every value and every plotted point is the true function value. There is no noise and no plot jitter. Inputs are sampled with seed `42`, so every run gives the same data.
 
 ## Leaderboard
 

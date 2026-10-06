@@ -42,7 +42,10 @@ jobs:
       - name: Build executable bundle
         shell: bash
         run: |
+          # --collect-data bundles the package's non-Python files (the curated
+          # image-puzzle PNGs). Without it every image puzzle crashes.
           python -m PyInstaller --noconfirm --clean --onedir \
+            --collect-data blackbox_game \
             --name "${{ matrix.asset }}" play.py
 
       - name: Prebuild matplotlib font cache
