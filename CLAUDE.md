@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this branch is
 
-`preesha-binaries` is the **player distribution branch** for the Blackbox ML Game, a command-line puzzle game (used in an ARIES competition) where players guess the hidden function behind an input/output dataset. This branch intentionally contains almost nothing:
+`binaries` is the **player distribution branch** for the Blackbox ML Game, a command-line puzzle game (used in an ARIES competition) where players guess the hidden function behind an input/output dataset. This branch intentionally contains almost nothing:
 
 - `launch.py` — the only file players run. It detects the OS/arch, downloads the matching prebuilt binary from a GitHub release, caches it under `~/.cache/blackbox-ml-game/<tag>/`, and `exec`s it with the player's CLI arguments.
 - `.github/workflows/build-binaries.yml` — builds those binaries with PyInstaller, one per OS/arch, and publishes them to a GitHub release when a `v*` tag is pushed.
@@ -25,7 +25,7 @@ There is nothing to build, lint, or test on *this* branch — `launch.py` is a s
 ## Releasing a new binary build
 
 1. Make the gameplay change on `code`, merge/commit it there.
-2. On `preesha-binaries`, bump `RELEASE_TAG` in `launch.py` to the new version.
+2. On `binaries`, bump `RELEASE_TAG` in `launch.py` to the new version.
 3. Push a tag matching that version (`git tag vX.Y.Z && git push --tags`). The workflow triggers on any `v*` tag push, checks out the **current tip of `code`** (not a pinned commit — see gotcha below), builds four binaries with PyInstaller, zips each, and publishes them to a GitHub release named after the tag.
 4. Confirm the release assets exist before telling players to update — `launch.py` will 404 instead of falling back if the tag/assets don't exist yet.
 
