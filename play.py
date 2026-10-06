@@ -7,18 +7,26 @@ COMMANDS
   python play.py list
       List all puzzle IDs.
 
-  python play.py show <puzzle_id>
-      Show a puzzle's description and input data. Image puzzles write two pictures.
+  python play.py show <puzzle_id> [--plot]
+      Show a puzzle's description and data. Image puzzles write input.png and output.png.
+
+  python play.py apply <puzzle_id> --apply NAME [NAME ...]
+      Apply image transforms left to right to an image puzzle's input picture.
 
   python play.py transforms
       Print all available transformation keys.
 
+  python play.py points <puzzle_id> --input FILE [--plot]
+      Compute y for a numerical puzzle at your own input points.
+
+  python play.py residuals <puzzle_id> --input FILE --features SPEC [SPEC ...] [--plot]
+      Fit a model to your points and export its residuals.
+
 QUICK START
 -----------
-  1.  pip install -e .
-  2.  python play.py list
-  3.  python play.py show puzzle_03
-  4.  # record your result on the leaderboard
+  1.  uv run python play.py list
+  2.  uv run python play.py show puzzle_03
+  3.  Record your result on the leaderboard.
 
 INPUT FILE FORMAT
 -----------------
@@ -28,6 +36,7 @@ INPUT FILE FORMAT
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -37,7 +46,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from blackbox_game import (
-    list_puzzles, get_puzzle, POWER_MAP,
+    list_puzzles, get_puzzle,
 )
 from blackbox_game.puzzles import puzzle_number, puzzle_id_from_number
 
@@ -45,7 +54,6 @@ from blackbox_game.puzzles import puzzle_number, puzzle_id_from_number
 # ── ANSI colours (VS Code terminal supports these) ────────────────────────
 _BOLD   = "\033[1m"
 _GREEN  = "\033[92m"
-_YELLOW = "\033[93m"
 _CYAN   = "\033[96m"
 _RED    = "\033[91m"
 _DIM    = "\033[2m"
@@ -53,7 +61,6 @@ _RESET  = "\033[0m"
 
 def _b(s):  return f"{_BOLD}{s}{_RESET}"
 def _g(s):  return f"{_GREEN}{s}{_RESET}"
-def _y(s):  return f"{_YELLOW}{s}{_RESET}"
 def _c(s):  return f"{_CYAN}{s}{_RESET}"
 def _r(s):  return f"{_RED}{s}{_RESET}"
 def _d(s):  return f"{_DIM}{s}{_RESET}"
@@ -61,11 +68,7 @@ def _d(s):  return f"{_DIM}{s}{_RESET}"
 
 SEP  = _d("─" * 64)
 SEP2 = _d("═" * 64)
-_PLOT_EPSILON = 1.0
-_PLOT_SEED = 42
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────
 
 # ── Command: list ─────────────────────────────────────────────────────────
 
@@ -100,16 +103,16 @@ def cmd_show(args):
     try:
         puzzle = get_puzzle(puzzle_id)
     except KeyError as e:
-        print(_r(str(e)))
+        print(_r(e.args[0]))
         sys.exit(1)
 
     if puzzle.function.type == "image":
         _show_image_puzzle(puzzle, puzzle_id)
         return
 
-    from blackbox_game import generate_dataset
+    from blackbox_game.generator import generate_dataset, sample_count
 
-    dataset = generate_dataset(puzzle, n_samples=100, seed=42)
+    dataset = generate_dataset(puzzle, n_samples=sample_count(puzzle), seed=42)
     X = dataset["X"]
     y = dataset["y"]
     plot_files, plot_note = [], None
@@ -120,9 +123,10 @@ def cmd_show(args):
     print(f"  ID: {_c(_puzzle_label(puzzle_id))}")
     print(SEP2)
     print()
-    for line in _wrap(puzzle.description):
-        print(f"  {line}")
-    print()
+    if puzzle.description:
+        for line in _wrap(puzzle.description):
+            print(f"  {line}")
+        print()
     print(_b("  Input features: ") + _c(", ".join(puzzle.input_features)))
     print()
 
@@ -152,10 +156,9 @@ def _show_image_puzzle(puzzle, puzzle_id: str) -> None:
     from blackbox_game.images import render_image_puzzle
     from blackbox_game.viewer import open_in_vscode
 
-    _ensure_output_dirs()
     params = puzzle.function.parameters
     input_png, output_png = render_image_puzzle(
-        params["image"], params["transform"], _puzzle_output_dir(puzzle_id),
+        params["image"], params["transform"], _ensure_puzzle_dir(puzzle_id),
     )
 
     print(f"\n{SEP2}")
@@ -175,20 +178,49 @@ def _show_image_puzzle(puzzle, puzzle_id: str) -> None:
     print()
 
 
+# ── Command: apply ────────────────────────────────────────────────────────
+
+def cmd_apply(args):
+    from PIL import Image
+    from blackbox_game.images import IMAGE_TRANSFORMS, apply_pipeline, puzzle_input_image
+    from blackbox_game.viewer import open_in_vscode
+
+    puzzle_id = _resolve_puzzle_id(args.puzzle_id)
+    try:
+        puzzle = get_puzzle(puzzle_id)
+    except KeyError as e:
+        print(_r(e.args[0]))
+        sys.exit(1)
+    if puzzle.function.type != "image":
+        print(_r("apply works on image puzzles only; this puzzle has numeric inputs."))
+        sys.exit(1)
+    unknown = [name for name in args.apply if name not in IMAGE_TRANSFORMS]
+    if unknown:
+        print(_r(f"Unknown transform(s): {', '.join(unknown)}"))
+        print(_d(f"  Valid names: {', '.join(IMAGE_TRANSFORMS)}"))
+        sys.exit(1)
+
+    result = apply_pipeline(puzzle_input_image(puzzle), args.apply)
+    output = _ensure_puzzle_dir(puzzle_id) / ("input_" + "_".join(args.apply) + ".png")
+    Image.fromarray(result).save(output)
+
+    print(f"\n{_g('✓')} Applied left to right: {_b(' → '.join(args.apply))}")
+    print(f"  Written: {_b(str(output))}")
+    if open_in_vscode([output]):
+        print("  Opened in VS Code.")
+    print()
+
+
 # ── Command: transforms ───────────────────────────────────────────────────
 
 def cmd_transforms(args):
     from blackbox_game import list_binary_transforms, list_transforms
 
     print(f"\n{_b('Unary transforms')} — use as \"transform:column\" in your features list\n")
-    print(f"  {'Key':<18} {'Description':<28} Power")
+    print(f"  {'Key':<18} Description")
     print(SEP)
     for t in list_transforms():
-        k    = t["key"]
-        desc = t["description"]
-        pw   = POWER_MAP.get(k, "")
-        pw_s = f"  x^{pw}" if pw != "" else ""
-        print(f"  {_c(k):<27} {desc:<28}{_d(pw_s)}")
+        print(f"  {_c(t['key']):<27} {t['description']}")
 
     print(f"\n{_b('Binary transforms')} — use as dict in your features list\n")
     print(f"  {'Key':<18} Description")
@@ -197,10 +229,17 @@ def cmd_transforms(args):
         print(f"  {_c(t['key']):<27} {t['description']}")
 
     print()
+    print(_b("  Image transforms"), "— use as --apply names for `apply`, applied left to right\n")
+    from blackbox_game.images import IMAGE_TRANSFORMS
+    for name in IMAGE_TRANSFORMS:
+        print(f"  {_c(name)}")
+    print()
     print(_b("  Feature spec formats:"))
     print('    "identity:x"                          → x (unary)')
     print('    "square:x"                            → x²  (unary)')
     print('    {"binary": "multiply", "a": "x1", "b": "x2"}  → x1 × x2')
+    print('    {"product": ["t", "sin:theta"]}             → t · sin(theta)')
+    print('    {"sum": ["x", {"term": "t", "sign": -1}], "transform": "sin"}  → sin(x − t)')
     print()
 
 
@@ -218,8 +257,14 @@ def _read_points(path: str, puzzle):
             try:
                 row = [float(value) for value in values]
             except ValueError as exc:
-                if not rows and [value.lower() for value in values] == puzzle.input_features:
+                header = [name.lower() for name in puzzle.input_features]
+                if not rows and [value.lower() for value in values] == header:
                     continue
+                if not rows:
+                    raise ValueError(
+                        f"Line {line_number} is not numbers and is not this puzzle's header "
+                        f"({', '.join(puzzle.input_features)})."
+                    ) from exc
                 raise ValueError(f"Line {line_number} contains a non-numeric value.") from exc
             if len(row) != len(puzzle.input_features):
                 expected = ", ".join(puzzle.input_features)
@@ -261,18 +306,31 @@ def _puzzle_output_dir(puzzle_id: str) -> Path:
     return _output_root() / _puzzle_label(puzzle_id)
 
 
-def _ensure_output_dirs() -> Path:
-    root = _output_root()
-    root.mkdir(exist_ok=True)
-    for number in range(1, len(list_puzzles()) + 1):
-        (root / f"puzzle_{number:02d}").mkdir(exist_ok=True)
-    return root
+def _ensure_puzzle_dir(puzzle_id: str) -> Path:
+    """Create and return outputs/puzzle_NN for this puzzle only."""
+    directory = _puzzle_output_dir(puzzle_id)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
 
 
 def _points_output_path(input_path: str, puzzle_id: str, suffix: str) -> Path:
     source = Path(input_path)
     label = _puzzle_label(puzzle_id)
-    return _ensure_output_dirs() / label / f"{source.stem}_{label}_{suffix}.csv"
+    return _ensure_puzzle_dir(puzzle_id) / f"{source.stem}_{label}_{suffix}.csv"
+
+
+def _parse_features(specs: list[str]) -> list:
+    """Plain specs stay strings; specs starting with '{' are JSON (products, sums, binaries)."""
+    features = []
+    for spec in specs:
+        if spec.lstrip().startswith("{"):
+            try:
+                features.append(json.loads(spec))
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Feature is not valid JSON: {spec}") from exc
+        else:
+            features.append(spec)
+    return features
 
 
 def _matplotlib_pyplot():
@@ -327,15 +385,14 @@ def _write_show_plots(puzzle, puzzle_id: str, X, y):
     """
     Write the plots for ``show --plot``.
 
-    Every puzzle gets univariate PNGs. Intermediate and challenge puzzles with
-    two or more inputs also get 3D PLY files, which are opened in VS Code.
+    Every numerical puzzle gets univariate PNGs. Physics puzzles with two or
+    more inputs also get 3D PLY files, which are opened in VS Code.
     Returns (files written, a note for the player or None).
     """
     from blackbox_game.plots import save_3d_plots
     from blackbox_game.viewer import ensure_viewer_extension, open_in_vscode
 
-    _ensure_output_dirs()
-    plots_dir = _puzzle_output_dir(puzzle_id) / "plots"
+    plots_dir = _ensure_puzzle_dir(puzzle_id) / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
     files = _save_univariate_plots(X, y, plots_dir)
 
@@ -366,14 +423,10 @@ def _plot_output(
     csv_path: Path,
     kind: str,
 ) -> Path:
-    """Save a non-interactive plot beside a generated CSV."""
-    import numpy as np
-
+    """Save a non-interactive plot beside a generated CSV. Values are plotted exactly."""
     plt = _matplotlib_pyplot()
 
     plot_path = csv_path.with_suffix(".png")
-    rng = np.random.default_rng(_PLOT_SEED)
-    plot_noise = lambda size: rng.uniform(-_PLOT_EPSILON, _PLOT_EPSILON, size)
     if kind == "points":
         input_columns = [
             column for column in data.columns
@@ -384,21 +437,19 @@ def _plot_output(
             figsize=(7, max(4, 3.5 * len(input_columns))),
             squeeze=False,
         )
-        plotted_y = data["y"].to_numpy() + plot_noise(len(data))
         for axis, column in zip(axes.flat, input_columns):
-            axis.scatter(data[column], plotted_y, alpha=0.7, s=24)
+            axis.scatter(data[column], data["y"], alpha=0.7, s=24)
             axis.set_xlabel(column)
             axis.set_ylabel("y")
             axis.set_title(f"{column} vs y")
             axis.grid(True, alpha=0.3)
     else:
         figure, axis = plt.subplots(figsize=(7, 4))
-        plotted_residual = data["residual"].to_numpy() + plot_noise(len(data))
-        axis.scatter(data["prediction"], plotted_residual, alpha=0.7, s=24)
+        axis.scatter(data["prediction"], data["residual"], alpha=0.7, s=24)
         axis.axhline(0.0, color="black", linestyle="--", linewidth=1)
         axis.set_xlabel("prediction")
-        axis.set_ylabel("residual (y - prediction) + plot noise")
-        axis.set_title(f"Residuals vs prediction (epsilon <= {_PLOT_EPSILON:g})")
+        axis.set_ylabel("residual (y - prediction)")
+        axis.set_title("Residuals vs prediction")
         axis.grid(True, alpha=0.3)
 
     figure.tight_layout()
@@ -432,16 +483,15 @@ def cmd_points(args):
 def cmd_residuals(args):
     try:
         from blackbox_game import evaluate_points
-        from blackbox_game.evaluator import build_feature_matrix, predict_model
+        from blackbox_game.fitting import build_feature_matrix, predict_model
 
         puzzle = get_puzzle(_resolve_puzzle_id(args.puzzle_id))
         if puzzle.function.type == "image":
             raise ValueError("image puzzles have no numeric inputs; use show instead")
         points = _read_points(args.input, puzzle)
         result = evaluate_points(puzzle, points)
-        X_feat = build_feature_matrix(result["X"], args.features)
-        task = "classification" if puzzle.function.type == "circle_classify" else "regression"
-        predictions = predict_model(X_feat, result["y"], args.model, task=task)
+        X_feat = build_feature_matrix(result["X"], _parse_features(args.features))
+        predictions = predict_model(X_feat, result["y"], args.model)
         output = Path(args.output) if args.output else _points_output_path(args.input, puzzle.id, "residuals")
         residuals = result["X"].assign(
             y=result["y"], prediction=predictions, residual=result["y"] - predictions
@@ -479,6 +529,12 @@ def build_parser() -> argparse.ArgumentParser:
     # transforms
     sub.add_parser("transforms", help="List all available transforms")
 
+    # apply
+    p_apply = sub.add_parser("apply", help="Apply image transforms to an image puzzle's input")
+    p_apply.add_argument("puzzle_id", help="Image puzzle ID (e.g. puzzle_11)")
+    p_apply.add_argument("--apply", nargs="+", required=True, metavar="TRANSFORM",
+                         help="Transform names, applied left to right (see `transforms`)")
+
     # points and residuals
     for command, handler_help in (
         ("points", "Evaluate a puzzle at user-supplied input points"),
@@ -492,7 +548,7 @@ def build_parser() -> argparse.ArgumentParser:
                       help="Also save a PNG plot beside the CSV")
         if command == "residuals":
             point_parser.add_argument("--features", nargs="+", required=True,
-                                      help="Feature specifications, e.g. identity:x sin:x")
+                                      help='Feature specs, e.g. square:t \'{"product": ["t", "sin:theta"]}\'')
             point_parser.add_argument("--model", choices=["linear_regression", "decision_tree"],
                                       default="linear_regression")
 
@@ -507,6 +563,7 @@ def main():
         "list":       cmd_list,
         "show":       cmd_show,
         "transforms": cmd_transforms,
+        "apply":      cmd_apply,
         "points":     cmd_points,
         "residuals":  cmd_residuals,
     }

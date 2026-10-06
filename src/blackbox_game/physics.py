@@ -2,7 +2,6 @@
 physics.py — Physical constants and exact formulas for the Physics round.
 
 Physics puzzles are deterministic: their outputs are exact function values.
-No puzzle adds formula noise; only an explicit ``noise_std`` adds noise.
 
 Each formula takes a mapping of input column name → 1-D array and returns
 the output array. Generator and point-evaluation code both call

@@ -35,7 +35,7 @@ Puzzles are identified publicly by number so their names do not reveal the under
 |---|---|
 | `puzzle_01` to `puzzle_06` | Numerical (beginner) |
 | `puzzle_07` to `puzzle_10` | Numerical (physics) |
-| `puzzle_11` to `puzzle_16` | Image |
+| `puzzle_11` to `puzzle_21` | Image |
 
 List the catalogue at any time:
 
@@ -43,23 +43,23 @@ List the catalogue at any time:
 uv run python play.py list
 ```
 
-## Playing A Puzzle
+## Numerical Puzzles
 
-Start with a puzzle description and a 100-row sample. For numerical puzzles:
+Show a puzzle and its sample data: 25 rows for beginner puzzles, 100 rows for physics puzzles.
 
 ```bash
 uv run python play.py show puzzle_07
 ```
 
-This prints the puzzle description, input columns, sample rows, and the transformations available for that puzzle.
+This prints the puzzle ID, its description (physics puzzles only: the setup and the fixed values), the input columns, and the sample rows.
 
-Create the plots for the generated sample:
+Create the plots for the sample:
 
 ```bash
 uv run python play.py show puzzle_07 --plot
 ```
 
-This writes one PNG per input (`y` against that input) and, for physics puzzles with two or more inputs, one 3D PLY file per pair of inputs:
+This writes one PNG per input (`y` against that input) and, for physics puzzles, one 3D PLY file per pair of inputs:
 
 ```text
 outputs/puzzle_07/plots/y_vs_theta.png
@@ -69,17 +69,50 @@ outputs/puzzle_07/plots/3d/puzzle_07_y_vs_theta_t.ply
 
 The 3D files open in VS Code. The first time you run this, the game installs the PLY viewer extension (`kleinicke.ply-visualizer`) for you. Drag with the mouse to rotate. If the `code` command is not on your PATH, the game tells you how to fix that.
 
-List all transformation names and binary operations:
+## Image Puzzles
+
+For an image puzzle, `show` writes two pictures and opens them in VS Code:
+
+```bash
+uv run python play.py show puzzle_11
+```
+
+```text
+outputs/puzzle_11/input.png
+outputs/puzzle_11/output.png
+```
+
+Work out what was done to `input.png` to make `output.png`. To test a guess, apply your own transforms to the input picture with `apply`. Give one or more transform names after `--apply`; they are applied left to right, and the result is saved as `input_<names>.png`:
+
+```bash
+uv run python play.py apply puzzle_11 --apply invert rotate
+```
+
+Run `uv run python play.py transforms` to see every image transform name.
+
+## Features
+
+List all feature transformations, binary operations, and image transform names:
 
 ```bash
 uv run python play.py transforms
 ```
 
-A feature such as `square:x1` means that the model receives $x1^2$ rather than the raw `x1`. A binary feature such as `{"binary": "multiply", "a": "x1", "b": "x2"}` means $x1 \times x2$.
+A feature is one of:
+
+| Feature | Meaning |
+|---|---|
+| `t` | the raw column |
+| `square:t` | a transform of a column, here $t^2$ |
+| `'{"binary": "multiply", "a": "x1", "b": "x2"}'` | two columns combined, here $x_1 x_2$ |
+| `'{"product": ["t", "sin:theta"]}'` | a product of features, here $t\sin\theta$ |
+| `'{"sum": ["x", {"term": "t", "sign": -1}], "transform": "sin"}'` | a sum of features (with signs), optionally transformed, here $\sin(x - t)$ |
+
+Features written with `{...}` are JSON. Put them in single quotes on the command line so the shell passes them through unchanged.
 
 ## Custom Input Points
 
-Use `points` when you want to evaluate the hidden function at your own input rows:
+Use `points` to compute `y` for a numerical puzzle at your own input rows:
 
 ```bash
 uv run python play.py points puzzle_10 --input points.txt
@@ -137,9 +170,11 @@ Use `residuals` to fit a model to your supplied points and export the observed o
 ```bash
 uv run python play.py residuals puzzle_07 \
   --input points.txt \
-  --features identity:t sin:theta \
+  --features square:t '{"product": ["t", "sin:theta"]}' \
   --model linear_regression
 ```
+
+`--model` is `linear_regression` (default) or `decision_tree`.
 
 The residual CSV is written to:
 
@@ -158,14 +193,14 @@ Add `--plot` to create `..._residuals.png` beside the CSV:
 ```bash
 uv run python play.py residuals puzzle_07 \
   --input points.txt \
-  --features identity:t sin:theta \
+  --features square:t '{"product": ["t", "sin:theta"]}' \
   --model linear_regression \
   --plot
 ```
 
-## Noise
+## Exact Values
 
-Numerical puzzles are exact: their outputs are the true function values, with no formula noise. A puzzle can declare its own Gaussian noise, but no current puzzle does. The `points` and `residuals` plots add visual jitter bounded by `1.0` so overlapping points stay visible. The jitter is not in the CSV files. Random jitter is not a meaningful feature: do not try to create a feature for it.
+Numerical puzzles are exact: every value in the output and every point on a plot is the true function value. There is no noise and no plot jitter. Inputs are sampled with seed `42`, so every run gives the same data.
 
 ## Leaderboard
 
@@ -177,7 +212,9 @@ This repository is the game engine and exploration tool. Do not create or send a
 uv run python play.py list
 uv run python play.py show puzzle_07
 uv run python play.py show puzzle_07 --plot
+uv run python play.py show puzzle_11
+uv run python play.py apply puzzle_11 --apply invert rotate
 uv run python play.py transforms
 uv run python play.py points puzzle_10 --input points.txt --plot
-uv run python play.py residuals puzzle_07 --input points.txt --features identity:t sin:theta --plot
+uv run python play.py residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' --plot
 ```
