@@ -47,7 +47,7 @@ The first run downloads the game for your computer (about 2 MB) and caches it; l
 | `puzzle_07` to `puzzle_10` | Numerical (physics) |
 | `puzzle_11` to `puzzle_17` | Image |
 
-## Commands
+## Numerical Puzzles
 
 Show a puzzle and its sample data (25 rows for beginner puzzles, 100 for physics):
 
@@ -61,32 +61,7 @@ Create its plots. Physics puzzles also get a 3D plot that opens in VS Code; the 
 uv run launch.py show puzzle_07 --plot
 ```
 
-For image puzzles, `show` writes each input picture with its output (`input.png`/`output.png`, or `input_1.png`/`output_1.png` and `input_2.png`/`output_2.png` when a puzzle shows two examples):
-
-```bash
-uv run launch.py show puzzle_11
-```
-
-To test a guess, use `apply` on one picture at a time: give it with `--input` (`.jpg`, `.jpeg` or `.png` only) and the transform names after `--apply`, applied left to right. The picture is cropped to a square and resized to 256×256 first, and the result goes to `outputs/apply/`. It can be a puzzle's input or any picture of your own:
-
-```bash
-uv run launch.py apply --input outputs/puzzle_11/input_1.png --apply rotate_chunks
-uv run launch.py apply --input my_photo.jpg --apply invert vignette
-```
-
-Everything is saved under:
-
-```text
-outputs/puzzle_XX/
-```
-
-List feature transformations and image transform names:
-
-```bash
-uv run launch.py transforms
-```
-
-Evaluate custom input points:
+Evaluate your own input points (see Input Files below):
 
 ```bash
 uv run launch.py points puzzle_07 --input points.txt --plot
@@ -102,7 +77,53 @@ uv run launch.py residuals puzzle_07 \
   --plot
 ```
 
-`points` writes `<input-name>_puzzle_XX_output.csv`. `residuals` writes `<input-name>_puzzle_XX_residuals.csv`. Each file and its optional PNG are placed in `outputs/puzzle_XX/`.
+`--model` is `linear_regression` (default) or `decision_tree`. `points` writes `<input-name>_puzzle_XX_output.csv` and `residuals` writes `<input-name>_puzzle_XX_residuals.csv`, both in `outputs/puzzle_XX/` with their optional PNG plot beside them.
+
+List every feature transform name:
+
+```bash
+uv run launch.py transforms
+```
+
+## Image Puzzles
+
+Each image puzzle shows one or two pictures and what they became after a hidden sequence of transforms. Your job is to find that sequence: which transforms, and in what order.
+
+**1. Look at the puzzle.**
+
+```bash
+uv run launch.py show puzzle_11
+```
+
+This writes the pictures to `outputs/puzzle_11/` and opens them in VS Code (if its `code` command is on PATH):
+
+- one example: `input.png` and `output.png`
+- two examples of the same puzzle: `input_1.png`/`output_1.png` and `input_2.png`/`output_2.png`
+
+**2. See the transforms you can use.** The image transform names are at the end of:
+
+```bash
+uv run launch.py transforms
+```
+
+They are: `rotate_chunks`, `mirror_sum`, `circular_shift`, `swap_rgb_rbg`, `swap_rgb_bgr`, `invert`, `solarise`, `posterise`, `opacity`, `vignette`, `ghost_echo`, `stretch_horizontal`.
+
+**3. Test a guess with `apply`.** Give one picture with `--input` and one or more transform names after `--apply`; they are applied left to right.
+
+```bash
+uv run launch.py apply --input outputs/puzzle_11/input_1.png --apply rotate_chunks
+uv run launch.py apply --input outputs/puzzle_15/input.png --apply invert vignette
+```
+
+The result is written to `outputs/apply/`, named after the picture and the transforms (for example `input_1_rotate_chunks.png`). Compare it with the puzzle's output picture: if they are identical, your guess is right. Order can matter: `invert vignette` and `vignette invert` may give different pictures.
+
+**4. Try your own pictures.** `apply` works on any `.jpg`, `.jpeg` or `.png`, which helps to see what a transform does:
+
+```bash
+uv run launch.py apply --input my_photo.jpg --apply mirror_sum
+```
+
+Every picture is first centre-cropped to a square and resized to 256×256, like the puzzle pictures; that version is saved too, as `outputs/apply/my_photo.png`.
 
 ## Input Files
 
