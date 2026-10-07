@@ -44,7 +44,7 @@ Show a puzzle and its sample data: 25 rows for beginner puzzles, 100 rows for ph
 cargo run --release -- show puzzle_07
 ```
 
-This prints the puzzle ID, its description (physics puzzles only: the setup and the fixed values), the input columns, and the sample rows.
+This prints the puzzle ID, the input columns, and the sample rows.
 
 Create the plots for the sample:
 

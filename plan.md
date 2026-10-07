@@ -15,11 +15,7 @@ There are **17 puzzles**, numbered `puzzle_01` to `puzzle_17` with no gaps. Numb
 
 ## Text shown to players
 
-Puzzle IDs, titles and tiers are never shown. The only text is each puzzle's `description`:
-
-- **Beginner:** none. The data is the whole puzzle.
-- **Physics:** the setup and the fixed values, worded like an exam problem. It must state every fixed value and nothing about the answer.
-- **Image:** the same neutral line for every image puzzle — "Work out what was done to each input picture to make its output picture." It must not hint at the transform, the number of steps, or whether order matters.
+Puzzle IDs, titles and tiers are never shown, and no puzzle has a description. `show` prints only `ID: puzzle_NN`, the input columns and the data (or, for image puzzles, the paths of the pictures).
 
 ## Code layout — where to make changes
 
@@ -27,7 +23,7 @@ The engine is done; later work should only touch puzzle definitions and images.
 
 | To change | Edit |
 |---|---|
-| Which puzzles exist, their order (= public numbers), descriptions, ranges, fixed values | `src/puzzles.rs` (definitions in `build()`) |
+| Which puzzles exist, their order (= public numbers), ranges, fixed values | `src/puzzles.rs` (definitions in `build()`) |
 | A physics formula or constant | `src/generator.rs` (`physics`, constants at the top) |
 | A beginner function type | `src/puzzles.rs` (`Function`) and `src/generator.rs` (`hidden_function`) |
 | Feature transforms players can use | `src/transforms.rs` |
@@ -43,14 +39,14 @@ Then update this file to match.
 
 ```bash
 blackbox-ml-game list                          # IDs only, no titles or tiers
-blackbox-ml-game show puzzle_07 [--plot]       # description + data, or the input/output pictures
+blackbox-ml-game show puzzle_07 [--plot]       # data, or the input/output pictures
 blackbox-ml-game apply --input photo.jpg --apply invert vignette   # one picture per command
 blackbox-ml-game transforms                    # every feature and image transform name
 blackbox-ml-game points puzzle_07 --input points.txt [--plot]
 blackbox-ml-game residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' [--plot]
 ```
 
-- `show` prints `ID: puzzle_NN`, the puzzle description (if any), the input columns and the sample rows. It does not print a title, a difficulty tier, or a list of models.
+- `show` prints `ID: puzzle_NN`, the input columns and the sample rows. It does not print a title, a difficulty tier, or a list of models.
 - There is **no submission or scoring code**. Players record results on the separate leaderboard.
 - `apply` takes exactly one picture per command, given with `--input`, like `points --input`. It is not tied to a puzzle: the picture can be a puzzle's `input.png` or any picture the player has. Only `.jpg`, `.jpeg` and `.png` are accepted (checked by extension and by the file's real format). The picture is centre-cropped to a square and resized to 256×256 first, so it behaves exactly like a puzzle picture; applying a puzzle's transform to its `input.png` reproduces its `output.png` exactly. `points` and `residuals` work on numerical puzzles only.
 
@@ -114,7 +110,7 @@ outputs/
 
 ## Round 2 — Physics (`puzzle_07` – `puzzle_10`)
 
-Each puzzle has exactly two input columns. Every other quantity is **fixed**, and the fixed values are stated in the puzzle's description the way an exam problem would state them. Input names keep the standard physics symbols as hints. The solution features listed below are the answer key; each reaches $R^2 = 1$.
+Each puzzle has exactly two input columns. Every other quantity is **fixed** (and not shown to players). Input names keep the standard physics symbols as hints. The solution features listed below are the answer key; each reaches $R^2 = 1$.
 
 | Puzzle | Inputs (range) | Fixed values | Ground-truth function | Solution features |
 |---|---|---|---|---|

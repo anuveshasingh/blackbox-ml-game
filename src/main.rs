@@ -2,7 +2,7 @@
 //!
 //! COMMANDS
 //!   list                                   List all puzzle IDs.
-//!   show <puzzle_id> [--plot]              A puzzle's description and data; image
+//!   show <puzzle_id> [--plot]              A puzzle's data; image
 //!                                          puzzles write their input/output pictures.
 //!   apply --input IMAGE --apply NAME...    Image transforms, left to right, on one picture.
 //!   transforms                             Every transformation key.
@@ -164,7 +164,18 @@ impl Model {
     }
 }
 
+#[cfg(unix)]
+extern "C" {
+    fn signal(signum: i32, handler: usize) -> usize;
+}
+
 fn main() {
+    // Exit quietly when the output pipe closes (e.g. `show ... | head`), like
+    // other command-line tools, instead of panicking on the failed write.
+    #[cfg(unix)]
+    unsafe {
+        signal(13 /* SIGPIPE */, 0 /* SIG_DFL */);
+    }
     let cli = Cli::parse();
     match cli.command {
         None => {
@@ -207,23 +218,6 @@ fn ensure_puzzle_dir(puzzle_id: &str) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-fn wrap(text: &str, width: usize) -> Vec<String> {
-    let mut lines = vec![];
-    let mut line = String::new();
-    for word in text.split_whitespace() {
-        if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > width {
-            lines.push(std::mem::take(&mut line));
-            line = word.to_string();
-        } else {
-            line = if line.is_empty() { word.to_string() } else { format!("{line} {word}") };
-        }
-    }
-    if !line.is_empty() {
-        lines.push(line);
-    }
-    lines
-}
-
 // ── Command: list ─────────────────────────────────────────────────────────
 
 fn cmd_list() {
@@ -259,12 +253,6 @@ fn cmd_show(identifier: &str, plot: bool) {
     println!("  ID: {}", cyan(&puzzle_label(puzzle.id)));
     println!("{}", sep2());
     println!();
-    if !puzzle.description.is_empty() {
-        for line in wrap(puzzle.description, 62) {
-            println!("  {line}");
-        }
-        println!();
-    }
     println!("{}{}", b("  Input features: "), cyan(&puzzle.input_features().join(", ")));
     println!();
 
@@ -304,10 +292,6 @@ fn show_image_puzzle(puzzle: &Puzzle) {
     println!("\n{}", sep2());
     println!("  ID: {}", cyan(&puzzle_label(puzzle.id)));
     println!("{}", sep2());
-    println!();
-    for line in wrap(puzzle.description, 62) {
-        println!("  {line}");
-    }
     println!();
     for (input, output) in &pairs {
         println!("  {}  {}", b("Input:"), input.display());
