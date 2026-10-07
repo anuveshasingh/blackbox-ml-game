@@ -4,28 +4,21 @@ A command-line puzzle game for discovering hidden relationships between input va
 
 ## Installation
 
-Install `uv` once. On macOS with Homebrew:
+This branch is the game written in Rust. Install Rust once from <https://rustup.rs>, then:
 
 ```bash
-brew install uv
-```
-
-On Windows or Linux, follow the installer at <https://docs.astral.sh/uv/getting-started/installation/>.
-
-Clone the repository and enter it:
-
-```bash
-git clone https://github.com/anuveshasingh/blackbox-ml-game.git
+git clone -b rust https://github.com/anuveshasingh/blackbox-ml-game.git
 cd blackbox-ml-game
+cargo build --release
 ```
 
-This single command creates the environment and installs all dependencies automatically:
+The game is one self-contained file, `target/release/blackbox-ml-game` (`.exe` on Windows), with the puzzle pictures and font built in. Nothing else is needed to run it. The examples below use `cargo run --release --`, which builds if needed and then runs it. You can call the binary directly instead.
 
 ```bash
-uv run python play.py list
+cargo run --release -- list
 ```
 
-No virtual-environment activation is needed. Later commands use the same `uv run python play.py ...` prefix.
+Outputs are written under `outputs/` in the current directory.
 
 ## Puzzle Groups
 
@@ -40,7 +33,7 @@ Puzzles are identified publicly by number so their names do not reveal the under
 List the catalogue at any time:
 
 ```bash
-uv run python play.py list
+cargo run --release -- list
 ```
 
 ## Numerical Puzzles
@@ -48,7 +41,7 @@ uv run python play.py list
 Show a puzzle and its sample data: 25 rows for beginner puzzles, 100 rows for physics puzzles.
 
 ```bash
-uv run python play.py show puzzle_07
+cargo run --release -- show puzzle_07
 ```
 
 This prints the puzzle ID, its description (physics puzzles only: the setup and the fixed values), the input columns, and the sample rows.
@@ -56,7 +49,7 @@ This prints the puzzle ID, its description (physics puzzles only: the setup and 
 Create the plots for the sample:
 
 ```bash
-uv run python play.py show puzzle_07 --plot
+cargo run --release -- show puzzle_07 --plot
 ```
 
 This writes one PNG per input (`y` against that input) and, for physics puzzles, one 3D PLY file per pair of inputs:
@@ -74,7 +67,7 @@ The 3D files open in VS Code. The first time you run this, the game installs the
 For an image puzzle, `show` writes each input picture with its output and opens them in VS Code. Some puzzles show two examples of the same change:
 
 ```bash
-uv run python play.py show puzzle_11
+cargo run --release -- show puzzle_11
 ```
 
 ```text
@@ -87,18 +80,18 @@ A puzzle with one example writes `input.png` and `output.png`. Work out what was
 The picture can be one of the puzzle's inputs or any picture of your own:
 
 ```bash
-uv run python play.py apply --input outputs/puzzle_11/input_1.png --apply rotate_chunks
-uv run python play.py apply --input my_photo.jpg --apply invert vignette
+cargo run --release -- apply --input outputs/puzzle_11/input_1.png --apply rotate_chunks
+cargo run --release -- apply --input my_photo.jpg --apply invert vignette
 ```
 
-Run `uv run python play.py transforms` to see every image transform name.
+Run `cargo run --release -- transforms` to see every image transform name.
 
 ## Features
 
 List all feature transformations, binary operations, and image transform names:
 
 ```bash
-uv run python play.py transforms
+cargo run --release -- transforms
 ```
 
 A feature is one of:
@@ -118,7 +111,7 @@ Features written with `{...}` are JSON. Put them in single quotes on the command
 Use `points` to compute `y` for a numerical puzzle at your own input rows:
 
 ```bash
-uv run python play.py points puzzle_10 --input points.txt
+cargo run --release -- points puzzle_10 --input points.txt
 ```
 
 The CSV is written under:
@@ -130,7 +123,7 @@ outputs/puzzle_10/<input-name>_puzzle_10_output.csv
 Add `--plot` to create a PNG beside the CSV:
 
 ```bash
-uv run python play.py points puzzle_10 --input points.txt --plot
+cargo run --release -- points puzzle_10 --input points.txt --plot
 ```
 
 ### Input File Format
@@ -171,7 +164,7 @@ Do not add a `y` column. The program calculates `y`. Do not add transformed colu
 Use `residuals` to fit a model to your supplied points and export the observed output, model prediction, and residual:
 
 ```bash
-uv run python play.py residuals puzzle_07 \
+cargo run --release -- residuals puzzle_07 \
   --input points.txt \
   --features square:t '{"product": ["t", "sin:theta"]}' \
   --model linear_regression
@@ -194,7 +187,7 @@ residual = y - prediction
 Add `--plot` to create `..._residuals.png` beside the CSV:
 
 ```bash
-uv run python play.py residuals puzzle_07 \
+cargo run --release -- residuals puzzle_07 \
   --input points.txt \
   --features square:t '{"product": ["t", "sin:theta"]}' \
   --model linear_regression \
@@ -212,12 +205,12 @@ This repository is the game engine and exploration tool. Do not create or send a
 ## Common Commands
 
 ```bash
-uv run python play.py list
-uv run python play.py show puzzle_07
-uv run python play.py show puzzle_07 --plot
-uv run python play.py show puzzle_11
-uv run python play.py apply --input my_photo.jpg --apply invert vignette
-uv run python play.py transforms
-uv run python play.py points puzzle_10 --input points.txt --plot
-uv run python play.py residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' --plot
+cargo run --release -- list
+cargo run --release -- show puzzle_07
+cargo run --release -- show puzzle_07 --plot
+cargo run --release -- show puzzle_11
+cargo run --release -- apply --input my_photo.jpg --apply invert vignette
+cargo run --release -- transforms
+cargo run --release -- points puzzle_10 --input points.txt --plot
+cargo run --release -- residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' --plot
 ```

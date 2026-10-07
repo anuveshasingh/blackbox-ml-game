@@ -27,27 +27,27 @@ The engine is done; later work should only touch puzzle definitions and images.
 
 | To change | Edit |
 |---|---|
-| Which puzzles exist, their order (= public numbers), descriptions, ranges, fixed values | `src/blackbox_game/puzzles.py` (definitions + `PUZZLE_REGISTRY`) |
-| A physics formula or constant | `src/blackbox_game/physics.py` (`FORMULAS`) |
-| A beginner function type | `src/blackbox_game/generator.py` (`_SAMPLERS`, `_hidden_function`) |
-| Feature transforms players can use | `src/blackbox_game/transforms.py` |
-| An image transform or its parameters | `src/blackbox_game/images.py` (`IMAGE_TRANSFORMS` and the constants at the top) |
-| A combination puzzle's steps or picture | `src/blackbox_game/images.py` (`PIPELINES`) |
-| Which pictures an image puzzle shows (one, or several examples) | `src/blackbox_game/puzzles.py` (the `images` list in `_image(...)`) |
-| The curated pictures | `src/blackbox_game/curated/*.png`, 256×256 RGB |
-| Sample sizes | `src/blackbox_game/generator.py` (`SAMPLE_COUNTS`) |
+| Which puzzles exist, their order (= public numbers), descriptions, ranges, fixed values | `src/puzzles.rs` (definitions in `build()`) |
+| A physics formula or constant | `src/generator.rs` (`physics`, constants at the top) |
+| A beginner function type | `src/puzzles.rs` (`Function`) and `src/generator.rs` (`hidden_function`) |
+| Feature transforms players can use | `src/transforms.rs` |
+| An image transform or its parameters | `src/images.rs` (`IMAGE_TRANSFORMS` and the constants at the top) |
+| A combination puzzle's steps or picture | `src/images.rs` (`PIPELINES`) |
+| Which pictures an image puzzle shows (one, or several examples) | `src/puzzles.rs` (the pictures in `image(...)`) |
+| The curated pictures | `assets/curated/*.png` (built into the binary; list new ones in `CURATED` in `src/images.rs`), 256×256 RGB |
+| Sample sizes | `src/generator.rs` (`sample_count`) |
 
 Then update this file to match.
 
 ## Player commands
 
 ```bash
-uv run python play.py list                          # IDs only, no titles or tiers
-uv run python play.py show puzzle_07 [--plot]       # description + data, or the input/output pictures
-uv run python play.py apply --input photo.jpg --apply invert vignette   # one picture per command
-uv run python play.py transforms                    # every feature and image transform name
-uv run python play.py points puzzle_07 --input points.txt [--plot]
-uv run python play.py residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' [--plot]
+blackbox-ml-game list                          # IDs only, no titles or tiers
+blackbox-ml-game show puzzle_07 [--plot]       # description + data, or the input/output pictures
+blackbox-ml-game apply --input photo.jpg --apply invert vignette   # one picture per command
+blackbox-ml-game transforms                    # every feature and image transform name
+blackbox-ml-game points puzzle_07 --input points.txt [--plot]
+blackbox-ml-game residuals puzzle_07 --input points.txt --features square:t '{"product": ["t", "sin:theta"]}' [--plot]
 ```
 
 - `show` prints `ID: puzzle_NN`, the puzzle description (if any), the input columns and the sample rows. It does not print a title, a difficulty tier, or a list of models.
@@ -56,7 +56,7 @@ uv run python play.py residuals puzzle_07 --input points.txt --features square:t
 
 ## Output folder
 
-Everything is written under `outputs/` (next to `play.py`, or in the current directory when run from the packaged binary).
+Everything is written under `outputs/` (in the current directory).
 
 ```text
 outputs/
@@ -146,7 +146,7 @@ Features passed to `residuals --features` can be (dict forms are written as JSON
 Unary transforms: `identity`, `square`, `cube`, `sqrt`, `abs`, `log`, `log2`, `reciprocal`, `sin`, `cos`, `exp`, `exp_neg`.
 Binary transforms: `multiply`, `divide`, `add`, `subtract`, `distance`.
 
-`residuals` fits `linear_regression` (default) or a depth-4 `decision_tree` (`src/blackbox_game/fitting.py`). Linear regression scales each feature column before fitting; this does not change the fit, but stops a very large column from swamping the others.
+`residuals` fits `linear_regression` (default) or a depth-4 `decision_tree` (`src/fitting.rs`, matching scikit-learn's `LinearRegression` and `DecisionTreeRegressor`). Linear regression scales each feature column before fitting; this does not change the fit, but stops a very large column from swamping the others.
 
 ## Round 3 — Image Processing (`puzzle_11` – `puzzle_17`)
 
@@ -154,10 +154,10 @@ No data points or plots. `show` writes each input/output pair (all 256×256 RGB)
 
 ### Curated images
 
-Each source picture is converted once to a 256×256 PNG in `src/blackbox_game/curated/`; the game reads only these PNGs. Most are centre-cropped to a square and resized. Two are placed so that `mirror_sum` lines up:
+Each source picture is converted once to a 256×256 PNG in `assets/curated/`; the game reads only these PNGs. Most are centre-cropped to a square and resized. Two are placed so that `mirror_sum` lines up:
 
 - `moon`: the moon's disc is centred in the square, so its flip lands on itself.
-- `molecule`: the drawing's own mirror line (found as the height where the drawing best matches its flip) is put exactly on the square's central horizontal line, so after the flip the ring and the OH groups coincide; only the parts that genuinely differ (Cl, H labels) double up. Transparency is flattened onto white.
+- `molecule` (from `smile.png`): the centre of the drawing's square ring is put exactly on the centre of the picture, so after the flip the ring and the OH groups coincide; only the parts that genuinely differ (Cl, H labels) double up.
 
 | Name | Source file | Used by |
 |---|---|---|
@@ -205,7 +205,7 @@ Each row is one puzzle. Where two pictures are listed, both are examples of the 
 
 ### Combination puzzles
 
-Steps are applied left to right as listed. "Commutes" means every ordering of the steps gives a pixel-identical picture (`images.pipeline_commutes`).
+Steps are applied left to right as listed. "Commutes" means every ordering of the steps gives a pixel-identical picture.
 
 | Puzzle | Image | Steps | Commutes? |
 |---|---|---|---|
@@ -227,13 +227,15 @@ Why they behave this way:
 
 ## Reproducibility
 
-- **Numerical puzzles:** exact function values, NumPy seed `42`. Every run prints identical data and draws identical plots.
+- **Numerical puzzles:** exact function values, seed `42` with NumPy's generator (PCG64 + SeedSequence, ported in `src/rng.rs`, so the rows are the same as the Python game's). Every run prints identical data and draws identical plots.
 - **Image puzzles:** the curated PNGs and every transform parameter are fixed in code, so `input.png` and `output.png` are byte-identical on every run.
 - **Fourier puzzles were removed.** There are no Fourier-transform puzzles or transforms.
 
 ## Packaging
 
-- Runtime dependencies: `numpy`, `pandas`, `scikit-learn`, `matplotlib`, `Pillow`. The curated PNGs are declared as package data.
-- The player binaries are built from the tip of `code` by the workflow on the `binaries` branch. Its PyInstaller step uses `--collect-data blackbox_game`, which bundles `curated/`. Any new file the game reads at runtime must live inside the `blackbox_game` package and match `package-data`, or the binaries will not include it.
+- The game is a single Rust binary (`cargo build --release`, about 2.3 MB). The curated PNGs and the plot font (`assets/DejaVuSans-subset.ttf`, matplotlib's DejaVu Sans cut down to the characters the plots use) are compiled into it with `include_bytes!`, so nothing else ships with it. Any new file the game reads must be added the same way.
+- Dependencies: `clap` (command line), `serde_json` (feature specs), `image` (PNG), `mozjpeg` (libjpeg-turbo, the JPEG decoder Pillow uses, so player photos give the same pixels), `ab_glyph` (font outlines). The JPEG decoder is C, built with the `cc` crate: building needs a C compiler but not cmake or nasm.
+- Output matches the Python game (the `code` branch): `show` text, generated data, `points` CSVs, every image puzzle and `apply` result, and the 3D PLY files are byte-identical. `residuals` predictions agree to floating-point rounding (about 1e-16 relative). PNG plots copy matplotlib's default style (figure size, DPI, font, tick placement), but they are drawn by `src/plots.rs`, so they are not pixel-identical to matplotlib's.
+- The `binaries` branch workflow still builds the Python game with PyInstaller. To ship this one, it should run `cargo build --release` per target and upload the single binary.
 - Player pictures for `apply --input` must be `.jpg`, `.jpeg` or `.png` (checked by extension and by the file's real format). All source pictures are kept as JPEG or PNG.
-- There is no test suite. Check changes by running `show`, `apply`, `points` and `residuals` on the affected puzzles.
+- `cargo test` covers number formatting only. Check changes by running `show`, `apply`, `points` and `residuals` on the affected puzzles.

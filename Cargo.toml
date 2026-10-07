@@ -1,0 +1,26 @@
+[package]
+name = "blackbox-ml-game"
+version = "0.4.0"
+edition = "2021"
+description = "An educational ML puzzle game for first-year students"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "blackbox-ml-game"
+path = "src/main.rs"
+
+[dependencies]
+ab_glyph = "0.2"
+clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+# libjpeg-turbo's decoder (as in Pillow), so JPEG photos decode to the same pixels.
+mozjpeg = { version = "0.10", default-features = false }
+mozjpeg-sys = { version = "2", default-features = false }
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
