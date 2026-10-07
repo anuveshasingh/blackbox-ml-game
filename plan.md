@@ -236,6 +236,16 @@ Why they behave this way:
 - The game is a single Rust binary (`cargo build --release`, about 2.3 MB). The curated PNGs and the plot font (`assets/DejaVuSans-subset.ttf`, matplotlib's DejaVu Sans cut down to the characters the plots use) are compiled into it with `include_bytes!`, so nothing else ships with it. Any new file the game reads must be added the same way.
 - Dependencies: `clap` (command line), `serde_json` (feature specs), `image` (PNG), `mozjpeg` (libjpeg-turbo, the JPEG decoder Pillow uses, so player photos give the same pixels), `ab_glyph` (font outlines). The JPEG decoder is C, built with the `cc` crate: building needs a C compiler but not cmake or nasm.
 - Output matches the Python game (the `code` branch): `show` text, generated data, `points` CSVs, every image puzzle and `apply` result, and the 3D PLY files are byte-identical. `residuals` predictions agree to floating-point rounding (about 1e-16 relative). PNG plots copy matplotlib's default style (figure size, DPI, font, tick placement), but they are drawn by `src/plots.rs`, so they are not pixel-identical to matplotlib's.
-- The `binaries` branch workflow still builds the Python game with PyInstaller. To ship this one, it should run `cargo build --release` per target and upload the single binary.
+- Players get the game from the `binaries` branch (and `main`, its copy): `launch.py` downloads the binary for their computer from the GitHub release named in its `RELEASE_TAG` and caches it under `~/.cache/blackbox-ml-game/<tag>/`. That branch's workflow builds this `rust` branch when a `v*` tag is pushed: musl static on Linux, static C runtime on Windows, macOS 11+, one zip per platform holding just the executable named after the asset.
+
+### Releasing a new version
+
+1. Commit and push the change on `rust`.
+2. On `binaries`, set `RELEASE_TAG` in `launch.py` to the new version, commit, push.
+3. Tag that commit and push the tag (`git tag vX.Y.Z && git push origin vX.Y.Z`). The workflow builds the tip of `rust`, smoke-tests each binary and publishes the release.
+4. Check the release has all four zips; `launch.py` fails instead of falling back if they are missing.
+5. Fast-forward `main`: `git push origin binaries:main`. A plain `git clone` gets `main`, so skipping this leaves players on the old release.
+
+Asset names in `launch.py`'s `_ASSET_NAMES` must match the workflow's `asset:` values exactly; only `launch.py` adds `.exe`.
 - Player pictures for `apply --input` must be `.jpg`, `.jpeg` or `.png` (checked by extension and by the file's real format). All source pictures are kept as JPEG or PNG.
 - `cargo test` covers number formatting only. Check changes by running `show`, `apply`, `points` and `residuals` on the affected puzzles.
