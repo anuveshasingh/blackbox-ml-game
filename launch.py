@@ -6,9 +6,8 @@ game logic itself: it just figures out which prebuilt native binary
 matches the current machine, downloads + caches it on first use, and then
 replaces itself with that binary (passing through all CLI arguments).
 
-The actual game (puzzles, scoring, plotting) lives in `play.py` and
-`src/blackbox_game/` on the `code` branch, and gets compiled into the
-binaries this script downloads. This branch (`binaries`) only
+The actual game (puzzles, plotting) is written in Rust on the `rust`
+branch, and gets compiled into the binaries this script downloads. This branch (`binaries`) only
 ever contains this launcher plus the GitHub Actions workflow that builds
 those binaries — see CLAUDE.md before changing either half.
 """
@@ -26,7 +25,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 REPOSITORY = "anuveshasingh/blackbox-ml-game"
-RELEASE_TAG = "v0.3.2"
+RELEASE_TAG = "v0.4.0"
 
 # Must match the `asset:` values in .github/workflows/build-binaries.yml
 # exactly (no extensions baked in here — see CLAUDE.md "Windows asset
@@ -96,12 +95,9 @@ def binary_path(name: str) -> Path:
     Return the path to a ready-to-run, cached copy of the `name` binary,
     downloading and extracting it first if this is the first run.
 
-    The binary is distributed as a PyInstaller `--onedir` bundle (not
-    `--onefile`): a onefile binary re-extracts its entire payload — here,
-    numpy/pandas/scikit-learn/matplotlib — into a fresh temp directory on
-    *every single launch*, which is what made every command feel slow
-    before. Onedir pays that extraction cost exactly once, here, and every
-    later launch runs the cached executable directly.
+    Each release asset is a zip holding one self-contained executable
+    (about 2 MB) named after the asset. It is extracted once, here, and
+    every later launch runs the cached executable directly.
     """
     cache_root = Path.home() / ".cache" / "blackbox-ml-game" / RELEASE_TAG
     cache_root.mkdir(parents=True, exist_ok=True)

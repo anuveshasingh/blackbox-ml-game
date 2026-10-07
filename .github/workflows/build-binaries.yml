@@ -17,67 +17,76 @@ jobs:
       matrix:
         include:
           - runner: macos-14
+            target: aarch64-apple-darwin
             asset: blackbox-ml-game-macos-arm64
           - runner: macos-15-intel
+            target: x86_64-apple-darwin
             asset: blackbox-ml-game-macos-x86_64
           - runner: windows-latest
+            target: x86_64-pc-windows-msvc
             asset: blackbox-ml-game-windows-x86_64
+          # musl: a fully static binary that runs on any x86_64 Linux,
+          # whatever its glibc version.
           - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
             asset: blackbox-ml-game-linux-x86_64
+
+    env:
+      # Run on macOS 11 and later, not only the runner's version.
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
 
     steps:
       - name: Checkout source branch
         uses: actions/checkout@v4
         with:
-          ref: code
+          ref: rust
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          python-version: "3.12"
+          targets: ${{ matrix.target }}
 
-      - name: Install dependencies
-        run: python -m pip install . pyinstaller
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - name: Build executable bundle
+      - name: Build executable
         shell: bash
         run: |
-          # --collect-data bundles the package's non-Python files (the curated
-          # image-puzzle PNGs). Without it every image puzzle crashes.
-          python -m PyInstaller --noconfirm --clean --onedir \
-            --collect-data blackbox_game \
-            --name "${{ matrix.asset }}" play.py
+          # Windows: link the C runtime statically so players need no VC++ redistributable.
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            export RUSTFLAGS="-C target-feature=+crt-static"
+          fi
+          cargo build --release --locked --target ${{ matrix.target }}
 
-      - name: Prebuild matplotlib font cache
-        shell: bash
-        # Players still pay this scan once per machine (play.py seeds its
-        # persistent cache from this file on first run), but it moves the
-        # cost here instead of a random player's first --plot.
-        run: |
-          MPLCONFIGDIR="$(pwd)/dist/${{ matrix.asset }}/_internal/mplcache" python -c "
-          import os
-          os.makedirs(os.environ['MPLCONFIGDIR'], exist_ok=True)
-          import matplotlib
-          matplotlib.use('Agg')
-          import matplotlib.pyplot as plt
-          "
-
-      - name: Zip executable bundle
+      - name: Smoke test
         shell: bash
         run: |
-          ASSET_NAME="${{ matrix.asset }}" python - <<'PY'
-          import os
-          from pathlib import Path
-          from zipfile import ZIP_DEFLATED, ZipFile
+          exe="target/${{ matrix.target }}/release/blackbox-ml-game"
+          [[ "${{ matrix.target }}" == *windows* ]] && exe="$exe.exe"
+          mkdir smoke && cd smoke
+          "../$exe" list
+          "../$exe" show puzzle_07 --plot
+          "../$exe" show puzzle_12
+          ls -R outputs
 
-          asset = os.environ["ASSET_NAME"]
-          root = Path("dist") / asset
-          archive = Path("dist") / f"{asset}.zip"
-          with ZipFile(archive, "w", ZIP_DEFLATED) as output:
-              for file in root.rglob("*"):
-                  if file.is_file():
-                      output.write(file, file.relative_to(root))
-          PY
+      - name: Zip executable
+        shell: bash
+        run: |
+          # The zip holds just the executable, named after the asset, which is
+          # where launch.py expects it after extracting.
+          ext=""
+          [[ "${{ matrix.target }}" == *windows* ]] && ext=".exe"
+          mkdir dist
+          cp "target/${{ matrix.target }}/release/blackbox-ml-game$ext" "dist/${{ matrix.asset }}$ext"
+          cd dist
+          if [[ -n "$ext" ]]; then
+            7z a "${{ matrix.asset }}.zip" "${{ matrix.asset }}$ext"
+          else
+            chmod +x "${{ matrix.asset }}"
+            zip "${{ matrix.asset }}.zip" "${{ matrix.asset }}"
+          fi
+          ls -l
 
       - name: Upload executable
         uses: actions/upload-artifact@v4
