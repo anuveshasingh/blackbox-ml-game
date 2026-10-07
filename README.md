@@ -4,15 +4,25 @@ A command-line puzzle game about discovering hidden relationships between input 
 
 ## Start
 
+You need `git` and `uv`. Python is not needed: `uv` fetches one by itself if the computer has none.
+
 Install `uv` once.
 
-macOS with Homebrew:
+macOS and Linux:
 
 ```bash
-brew install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Windows and Linux: install `uv` from <https://docs.astral.sh/uv/getting-started/installation/>.
+(or `brew install uv` with Homebrew)
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Then open a new terminal so `uv` is found.
 
 Clone the repo:
 
@@ -27,7 +37,7 @@ Start the game. This is the only game setup command:
 uv run launch.py list
 ```
 
-The first run downloads the correct game executable for the computer and caches it. Players do not need Python packages or a virtual environment beyond `uv` itself.
+The first run downloads the game for your computer (about 2 MB) and caches it; later runs start instantly.
 
 ## Puzzle Groups
 
